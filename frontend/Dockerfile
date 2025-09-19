@@ -9,12 +9,6 @@ RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml* ./
 RUN pnpm install
 
-# Copy source code
-COPY . .
-
-# Build the app
-RUN pnpm run build
-
 EXPOSE 3000
 
 CMD ["pnpm", "dev"]
