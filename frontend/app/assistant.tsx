@@ -37,7 +37,6 @@ import {
   MessageSquareIcon,
   PlusIcon,
   RefreshCwIcon,
-  TrashIcon,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -51,7 +50,6 @@ interface ChatThread {
   id: string;
   title: string;
   messages: Message[];
-  lastMessage?: string;
   createdAt: Date;
 }
 
@@ -160,15 +158,6 @@ export const Assistant = () => {
     }
   };
 
-  const deleteThread = (threadId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setThreads((prev) => prev.filter((t) => t.id !== threadId));
-    if (currentThreadId === threadId) {
-      setCurrentThreadId(null);
-      setMessages([]);
-    }
-  };
-
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -248,7 +237,6 @@ export const Assistant = () => {
               ...thread,
               id: backendSessionId || threadId, // Update thread ID to match backend session_id
               messages: updatedMessages,
-              lastMessage: assistantMessage.content.slice(0, 50) + "...",
               title:
                 thread.title === "New Chat"
                   ? userMessage.content.slice(0, 30) +
@@ -345,10 +333,6 @@ export const Assistant = () => {
             item.title ||
             "Chat " + (sessionId ? sessionId.slice(0, 8) : "unknown"),
           messages: messages, // Use embedded messages if available
-          lastMessage:
-            messages.length > 0
-              ? messages[messages.length - 1].content.slice(0, 50) + "..."
-              : "",
           createdAt: item.created_at ? new Date(item.created_at) : new Date(),
         };
       });
@@ -467,20 +451,8 @@ export const Assistant = () => {
                             <span className="truncate text-sm font-medium">
                               {thread.title}
                             </span>
-                            {thread.lastMessage && (
-                              <span className="truncate text-xs text-muted-foreground">
-                                {thread.lastMessage}
-                              </span>
-                            )}
                           </div>
                         </SidebarMenuButton>
-                        <button
-                          onClick={(e) => deleteThread(thread.id, e)}
-                          className="absolute right-1 flex h-6 w-6 items-center justify-center rounded p-0 opacity-0 group-hover:opacity-100 hover:bg-sidebar-accent"
-                          title="Delete Chat"
-                        >
-                          <TrashIcon className="h-3 w-3" />
-                        </button>
                       </div>
                     </SidebarMenuItem>
                   ))
