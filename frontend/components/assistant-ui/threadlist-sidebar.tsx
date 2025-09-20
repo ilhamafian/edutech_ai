@@ -1,10 +1,12 @@
 import * as React from "react";
-import { Github, MessagesSquare } from "lucide-react";
+import { BookOpen, ChartLine, Github, ListCheck, MessagesSquare } from "lucide-react";
 import Link from "next/link";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -12,6 +14,8 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { ThreadList } from "@/components/assistant-ui/thread-list";
+import { Button } from "../ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
 export function ThreadListSidebar({
   ...props
@@ -43,7 +47,34 @@ export function ThreadListSidebar({
         </div>
       </SidebarHeader>
       <SidebarContent className="aui-sidebar-content px-2">
-        <ThreadList />
+        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+              <SidebarMenu className="space-y-1">
+                <SidebarMenuItem>
+                  <SidebarMenuButton className="hover:bg-muted data-active:bg-muted">
+                    <BookOpen className="size-4"/>
+                    <span>Ask AI</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton className="hover:bg-muted data-active:bg-muted">
+                    <ListCheck className="size-4"/>
+                    <span>Quiz</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton className="hover:bg-muted data-active:bg-muted">
+                    <ChartLine className="size-4"/>
+                    <span>Analytics</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+        </SidebarGroup>
+        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+          <SidebarGroupLabel>Chats</SidebarGroupLabel>
+          <SidebarMenu>
+            <ThreadList />
+          </SidebarMenu>
+        </SidebarGroup>
       </SidebarContent>
       <SidebarRail />
       <SidebarFooter className="aui-sidebar-footer border-t">
