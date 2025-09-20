@@ -1,4 +1,3 @@
-version: "3.8"
 
 services:
   backend:
@@ -33,3 +32,4 @@ services:
     image: amazon/dynamodb-local
     ports:
       - "8001:8000"
+    command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
