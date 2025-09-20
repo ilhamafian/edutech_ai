@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -55,6 +55,10 @@ interface ChatThread {
 }
 
 export const Assistant = () => {
+  // Hardcoded values for debugging
+  const HARDCODED_SESSION_ID = "d3ce7694-383a-4405-98f3-9913dcdc5df5";
+  const HARDCODED_USER_ID = "1";
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -62,21 +66,20 @@ export const Assistant = () => {
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
 
   const createNewThread = () => {
-    const newThreadId = Date.now().toString();
     const newThread: ChatThread = {
-      id: newThreadId,
+      id: HARDCODED_SESSION_ID,
       title: "New Chat",
       messages: [],
       createdAt: new Date(),
     };
-    
-    setThreads(prev => [newThread, ...prev]);
-    setCurrentThreadId(newThreadId);
+
+    setThreads((prev) => [newThread, ...prev]);
+    setCurrentThreadId(HARDCODED_SESSION_ID);
     setMessages([]);
   };
 
   const switchToThread = (threadId: string) => {
-    const thread = threads.find(t => t.id === threadId);
+    const thread = threads.find((t) => t.id === threadId);
     if (thread) {
       setCurrentThreadId(threadId);
       setMessages(thread.messages);
@@ -85,7 +88,7 @@ export const Assistant = () => {
 
   const deleteThread = (threadId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setThreads(prev => prev.filter(t => t.id !== threadId));
+    setThreads((prev) => prev.filter((t) => t.id !== threadId));
     if (currentThreadId === threadId) {
       setCurrentThreadId(null);
       setMessages([]);
@@ -95,17 +98,18 @@ export const Assistant = () => {
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
-    // Create new thread if none exists
+    // Create new thread if none exists - using hardcoded session_id
     let threadId = currentThreadId;
     if (!threadId) {
-      threadId = Date.now().toString();
+      threadId = HARDCODED_SESSION_ID;
       const newThread: ChatThread = {
         id: threadId,
-        title: input.trim().slice(0, 30) + (input.trim().length > 30 ? "..." : ""),
+        title:
+          input.trim().slice(0, 30) + (input.trim().length > 30 ? "..." : ""),
         messages: [],
         createdAt: new Date(),
       };
-      setThreads(prev => [newThread, ...prev]);
+      setThreads((prev) => [newThread, ...prev]);
       setCurrentThreadId(threadId);
     }
 
@@ -121,43 +125,68 @@ export const Assistant = () => {
     setIsLoading(true);
 
     try {
+      const requestBody = {
+        prompt: userMessage.content, // ✅ match Lambda param
+        user_id: HARDCODED_USER_ID, // ✅ hardcoded for debugging
+        session_id: HARDCODED_SESSION_ID, // ✅ hardcoded for debugging
+      };
+      console.log("Sending request to /api/chat:", requestBody);
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [{
-            id: userMessage.id,
-            role: userMessage.role,
-            parts: [{ type: "text", text: userMessage.content }],
-          }],
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      if (!response.ok) {
+        throw new Error(`Backend error ${response.status}`);
+      }
+
       const data = await response.json();
-      
+      console.log("Response data from Lambda:", data);
+
+      // Handle session_id returned from Lambda
+      const backendSessionId = data.session_id;
+      if (backendSessionId && backendSessionId !== threadId) {
+        // Update the current thread ID if Lambda created a new session_id
+        setCurrentThreadId(backendSessionId);
+        threadId = backendSessionId;
+      }
+
       const assistantMessage: Message = {
-        id: data.id,
+        id: Date.now().toString(),
         role: "assistant",
-        content: data.content,
+        content: data.response || "No response",
       };
 
+      console.log("Created assistant message:", assistantMessage);
+
       const updatedMessages = [...newMessages, assistantMessage];
+      console.log("Updating messages to:", updatedMessages);
       setMessages(updatedMessages);
-      
+
       // Update thread with new messages and title if it's the first message
-      setThreads(prev => prev.map(thread => 
-        thread.id === threadId 
-          ? {
+      setThreads((prev) =>
+        prev.map((thread) => {
+          // Handle both old threadId and new backendSessionId
+          if (thread.id === currentThreadId || thread.id === threadId) {
+            return {
               ...thread,
+              id: backendSessionId || threadId, // Update thread ID to match backend session_id
               messages: updatedMessages,
               lastMessage: assistantMessage.content.slice(0, 50) + "...",
-              title: thread.title === "New Chat" ? userMessage.content.slice(0, 30) + (userMessage.content.length > 30 ? "..." : "") : thread.title
-            }
-          : thread
-      ));
-      
+              title:
+                thread.title === "New Chat"
+                  ? userMessage.content.slice(0, 30) +
+                    (userMessage.content.length > 30 ? "..." : "")
+                  : thread.title,
+            };
+          }
+          return thread;
+        }),
+      );
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error in sendMessage:", error);
       const errorMessage: Message = {
         id: Date.now().toString(),
         role: "assistant",
@@ -165,13 +194,15 @@ export const Assistant = () => {
       };
       const updatedMessages = [...newMessages, errorMessage];
       setMessages(updatedMessages);
-      
+
       // Update thread with error message
-      setThreads(prev => prev.map(thread => 
-        thread.id === threadId 
-          ? { ...thread, messages: updatedMessages }
-          : thread
-      ));
+      setThreads((prev) =>
+        prev.map((thread) =>
+          thread.id === currentThreadId || thread.id === threadId
+            ? { ...thread, messages: updatedMessages }
+            : thread,
+        ),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -184,30 +215,33 @@ export const Assistant = () => {
     }
   };
 
-  const getThreads = async () => {
-    try {
-      console.log("Getting threads");
-      const requestBody = {
-        user_id: "1",
-        id:"1"
-      }
-      console.log("Request body", requestBody);
-      const response = await fetch("https://ywcdy4t13i.execute-api.us-east-1.amazonaws.com/dev/qna", {
-        method: "POST",
-        body: JSON.stringify(requestBody),
-      });
+  // const getThreads = async () => {
+  //   try {
+  //     console.log("Getting threads");
+  //     const requestBody = {
+  //       user_id: "1",
+  //       id: "1",
+  //     };
+  //     console.log("Request body", requestBody);
+  //     const response = await fetch(
+  //       "https://ywcdy4t13i.execute-api.us-east-1.amazonaws.com/dev/qna",
+  //       {
+  //         method: "POST",
+  //         body: JSON.stringify(requestBody),
+  //       },
+  //     );
 
-      const data = await response.json();
-      console.log("Data", data);
-      setThreads(data);
-    } catch (error) {
-      console.error("Error:", error);
-    }
-  };
+  //     const data = await response.json();
+  //     console.log("Data", data);
+  //     setThreads(data);
+  //   } catch (error) {
+  //     console.error("Error:", error);
+  //   }
+  // };
 
-  useEffect(() => {
-    getThreads();
-  }, []);
+  // useEffect(() => {
+  //   getThreads();
+  // }, []);
 
   return (
     <SidebarProvider>
@@ -232,7 +266,7 @@ export const Assistant = () => {
               </SidebarMenu>
             </div>
           </SidebarHeader>
-          
+
           <SidebarContent className="px-2">
             <SidebarGroup className="group-data-[collapsible=icon]:hidden">
               <SidebarGroupLabel>Tools</SidebarGroupLabel>
@@ -240,7 +274,7 @@ export const Assistant = () => {
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <Link href="/">
-                      <BookOpen className="size-4"/>
+                      <BookOpen className="size-4" />
                       <span>Ask Tutor</span>
                     </Link>
                   </SidebarMenuButton>
@@ -248,7 +282,7 @@ export const Assistant = () => {
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <Link href="/quiz">
-                      <ListCheck className="size-4"/>
+                      <ListCheck className="size-4" />
                       <span>Quiz</span>
                     </Link>
                   </SidebarMenuButton>
@@ -256,14 +290,14 @@ export const Assistant = () => {
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <Link href="/analytics">
-                      <ChartLine className="size-4"/>
+                      <ChartLine className="size-4" />
                       <span>Analytics</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroup>
-            
+
             <SidebarGroup className="group-data-[collapsible=icon]:hidden">
               <div className="flex items-center justify-between">
                 <SidebarGroupLabel>Chats</SidebarGroupLabel>
@@ -282,14 +316,14 @@ export const Assistant = () => {
                     <div className="group relative flex items-center">
                       <SidebarMenuButton
                         onClick={() => switchToThread(thread.id)}
-                        className={`flex-1 ${currentThreadId === thread.id ? 'bg-sidebar-accent' : ''}`}
+                        className={`flex-1 ${currentThreadId === thread.id ? "bg-sidebar-accent" : ""}`}
                       >
                         <MessageSquareIcon className="size-4" />
                         <span className="truncate">{thread.title}</span>
                       </SidebarMenuButton>
                       <button
                         onClick={(e) => deleteThread(thread.id, e)}
-                        className="absolute right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded hover:bg-sidebar-accent"
+                        className="absolute right-1 flex h-6 w-6 items-center justify-center rounded p-0 opacity-0 group-hover:opacity-100 hover:bg-sidebar-accent"
                       >
                         <TrashIcon className="h-3 w-3" />
                       </button>
@@ -299,7 +333,7 @@ export const Assistant = () => {
               </SidebarMenu>
             </SidebarGroup>
           </SidebarContent>
-          
+
           <SidebarRail />
           <SidebarFooter className="border-t">
             <SidebarMenu>
@@ -345,17 +379,21 @@ export const Assistant = () => {
               </BreadcrumbList>
             </Breadcrumb>
           </header>
-          
+
           <div className="flex flex-1 flex-col overflow-hidden">
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 space-y-4 overflow-y-auto p-4">
               {messages.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-full text-center">
-                  <h2 className="text-2xl font-semibold mb-2">Welcome to your AI Tutor!</h2>
-                  <p className="text-muted-foreground">Ready to learn? Ask me anything!</p>
+                <div className="flex h-full flex-col items-center justify-center text-center">
+                  <h2 className="mb-2 text-2xl font-semibold">
+                    Welcome to your AI Tutor!
+                  </h2>
+                  <p className="text-muted-foreground">
+                    Ready to learn? Ask me anything!
+                  </p>
                 </div>
               )}
-              
+
               {messages.map((message) => (
                 <div
                   key={message.id}
@@ -372,10 +410,10 @@ export const Assistant = () => {
                   </div>
                 </div>
               ))}
-              
+
               {isLoading && (
                 <div className="flex justify-start">
-                  <div className="bg-muted text-foreground max-w-[80%] rounded-3xl px-4 py-2">
+                  <div className="max-w-[80%] rounded-3xl bg-muted px-4 py-2 text-foreground">
                     Thinking...
                   </div>
                 </div>
@@ -384,7 +422,7 @@ export const Assistant = () => {
 
             {/* Input */}
             <div className="border-t p-4">
-              <div className="flex gap-2 max-w-4xl mx-auto">
+              <div className="mx-auto flex max-w-4xl gap-2">
                 <Input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -393,8 +431,8 @@ export const Assistant = () => {
                   disabled={isLoading}
                   className="flex-1"
                 />
-                <Button 
-                  onClick={sendMessage} 
+                <Button
+                  onClick={sendMessage}
                   disabled={!input.trim() || isLoading}
                   size="icon"
                 >
