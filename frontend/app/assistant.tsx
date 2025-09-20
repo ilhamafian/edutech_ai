@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -36,6 +36,7 @@ import {
   MessagesSquare,
   MessageSquareIcon,
   PlusIcon,
+  RefreshCwIcon,
   TrashIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -54,35 +55,108 @@ interface ChatThread {
   createdAt: Date;
 }
 
+interface DynamoDBChatItem {
+  id?: string; // session_id might be in id field
+  session_id?: string; // or in session_id field
+  user_id: string;
+  title?: string;
+  created_at?: string;
+  updated_at?: string;
+  messages?: Array<{
+    role: string;
+    content: string;
+    timestamp: string;
+  }>;
+  // Add other fields that might exist in your DynamoDB items
+  [key: string]: string | number | boolean | undefined | Array<unknown>;
+}
+
 export const Assistant = () => {
-  // Hardcoded values for debugging
-  const HARDCODED_SESSION_ID = "d3ce7694-383a-4405-98f3-9913dcdc5df5";
+  // Hardcoded value for debugging
   const HARDCODED_USER_ID = "1";
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
 
   const createNewThread = () => {
+    const newThreadId = crypto.randomUUID();
     const newThread: ChatThread = {
-      id: HARDCODED_SESSION_ID,
+      id: newThreadId,
       title: "New Chat",
       messages: [],
       createdAt: new Date(),
     };
 
     setThreads((prev) => [newThread, ...prev]);
-    setCurrentThreadId(HARDCODED_SESSION_ID);
+    setCurrentThreadId(newThreadId);
     setMessages([]);
   };
 
-  const switchToThread = (threadId: string) => {
+  const fetchMessagesForSession = async (sessionId: string) => {
+    try {
+      setIsLoadingMessages(true);
+      console.log("Fetching messages for session:", sessionId);
+
+      const response = await fetch(`/api/chat?session_id=${sessionId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch messages: ${response.status}`);
+      }
+
+      const messages = await response.json();
+      console.log("Fetched messages:", messages);
+
+      // Convert API messages to our Message format
+      const formattedMessages: Message[] = messages.map(
+        (msg: {
+          id?: string;
+          role: string;
+          content: string;
+          timestamp?: string;
+        }) => ({
+          id: msg.id || Date.now().toString(),
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
+        }),
+      );
+
+      return formattedMessages;
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      return [];
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
+  const switchToThread = async (threadId: string) => {
     const thread = threads.find((t) => t.id === threadId);
     if (thread) {
       setCurrentThreadId(threadId);
-      setMessages(thread.messages);
+
+      // If thread already has messages, use them, otherwise fetch from API
+      if (thread.messages.length > 0) {
+        setMessages(thread.messages);
+      } else {
+        const fetchedMessages = await fetchMessagesForSession(threadId);
+        setMessages(fetchedMessages);
+
+        // Update the thread with fetched messages
+        setThreads((prev) =>
+          prev.map((t) =>
+            t.id === threadId ? { ...t, messages: fetchedMessages } : t,
+          ),
+        );
+      }
     }
   };
 
@@ -98,10 +172,10 @@ export const Assistant = () => {
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
-    // Create new thread if none exists - using hardcoded session_id
+    // Create new thread if none exists
     let threadId = currentThreadId;
     if (!threadId) {
-      threadId = HARDCODED_SESSION_ID;
+      threadId = crypto.randomUUID();
       const newThread: ChatThread = {
         id: threadId,
         title:
@@ -128,7 +202,7 @@ export const Assistant = () => {
       const requestBody = {
         prompt: userMessage.content, // ✅ match Lambda param
         user_id: HARDCODED_USER_ID, // ✅ hardcoded for debugging
-        session_id: HARDCODED_SESSION_ID, // ✅ hardcoded for debugging
+        session_id: threadId, // ✅ use current thread ID
       };
       console.log("Sending request to /api/chat:", requestBody);
 
@@ -185,6 +259,9 @@ export const Assistant = () => {
           return thread;
         }),
       );
+
+      // Refresh chat histories to sync with backend
+      getChatHistories();
     } catch (error) {
       console.error("Error in sendMessage:", error);
       const errorMessage: Message = {
@@ -215,33 +292,79 @@ export const Assistant = () => {
     }
   };
 
-  // const getThreads = async () => {
-  //   try {
-  //     console.log("Getting threads");
-  //     const requestBody = {
-  //       user_id: "1",
-  //       id: "1",
-  //     };
-  //     console.log("Request body", requestBody);
-  //     const response = await fetch(
-  //       "https://ywcdy4t13i.execute-api.us-east-1.amazonaws.com/dev/qna",
-  //       {
-  //         method: "POST",
-  //         body: JSON.stringify(requestBody),
-  //       },
-  //     );
+  const getChatHistories = async () => {
+    try {
+      console.log("Getting chat histories for user:", HARDCODED_USER_ID);
 
-  //     const data = await response.json();
-  //     console.log("Data", data);
-  //     setThreads(data);
-  //   } catch (error) {
-  //     console.error("Error:", error);
-  //   }
-  // };
+      const response = await fetch("/api/chat", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
-  // useEffect(() => {
-  //   getThreads();
-  // }, []);
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data: DynamoDBChatItem[] = await response.json();
+      console.log("Chat histories from DynamoDB:", data);
+      console.log("First item structure:", data[0]);
+
+      // Convert DynamoDB items to ChatThread format
+      const chatThreads: ChatThread[] = data.map((item, index) => {
+        console.log(`Processing item ${index}:`, item);
+
+        // Handle both id and session_id fields from DynamoDB
+        const sessionId = item.id || item.session_id || "unknown-session";
+
+        // If messages are already included, we can cache them
+        const messages: Message[] = item.messages
+          ? item.messages.map(
+              (
+                msg: {
+                  role: string;
+                  content: string;
+                  timestamp: string;
+                },
+                msgIndex: number,
+              ) => ({
+                id: `${sessionId}-msg-${msgIndex}`,
+                role:
+                  msg.role === "agent"
+                    ? "assistant"
+                    : (msg.role as "user" | "assistant"),
+                content: msg.content,
+              }),
+            )
+          : [];
+
+        return {
+          id: sessionId,
+          title:
+            item.title ||
+            "Chat " + (sessionId ? sessionId.slice(0, 8) : "unknown"),
+          messages: messages, // Use embedded messages if available
+          lastMessage:
+            messages.length > 0
+              ? messages[messages.length - 1].content.slice(0, 50) + "..."
+              : "",
+          createdAt: item.created_at ? new Date(item.created_at) : new Date(),
+        };
+      });
+
+      // Sort by creation date, newest first
+      chatThreads.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+      setThreads(chatThreads);
+    } catch (error) {
+      console.error("Error fetching chat histories:", error);
+    }
+  };
+
+  useEffect(() => {
+    getChatHistories();
+  }, []);
 
   return (
     <SidebarProvider>
@@ -301,35 +424,67 @@ export const Assistant = () => {
             <SidebarGroup className="group-data-[collapsible=icon]:hidden">
               <div className="flex items-center justify-between">
                 <SidebarGroupLabel>Chats</SidebarGroupLabel>
-                <Button
-                  onClick={createNewThread}
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 w-6 p-0"
-                >
-                  <PlusIcon className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    onClick={createNewThread}
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0"
+                    title="New Chat"
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    onClick={getChatHistories}
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0"
+                    title="Refresh Chats"
+                  >
+                    <RefreshCwIcon className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <SidebarMenu className="space-y-1">
-                {threads.map((thread) => (
-                  <SidebarMenuItem key={thread.id}>
-                    <div className="group relative flex items-center">
-                      <SidebarMenuButton
-                        onClick={() => switchToThread(thread.id)}
-                        className={`flex-1 ${currentThreadId === thread.id ? "bg-sidebar-accent" : ""}`}
-                      >
-                        <MessageSquareIcon className="size-4" />
-                        <span className="truncate">{thread.title}</span>
-                      </SidebarMenuButton>
-                      <button
-                        onClick={(e) => deleteThread(thread.id, e)}
-                        className="absolute right-1 flex h-6 w-6 items-center justify-center rounded p-0 opacity-0 group-hover:opacity-100 hover:bg-sidebar-accent"
-                      >
-                        <TrashIcon className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </SidebarMenuItem>
-                ))}
+                {threads.length === 0 ? (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                    No chat history yet
+                  </div>
+                ) : (
+                  threads.map((thread) => (
+                    <SidebarMenuItem key={thread.id}>
+                      <div className="group relative flex items-center">
+                        <SidebarMenuButton
+                          onClick={() => switchToThread(thread.id)}
+                          className={`flex-1 justify-start gap-2 ${
+                            currentThreadId === thread.id
+                              ? "bg-sidebar-accent"
+                              : ""
+                          }`}
+                        >
+                          <MessageSquareIcon className="size-4 flex-shrink-0" />
+                          <div className="flex min-w-0 flex-1 flex-col items-start">
+                            <span className="truncate text-sm font-medium">
+                              {thread.title}
+                            </span>
+                            {thread.lastMessage && (
+                              <span className="truncate text-xs text-muted-foreground">
+                                {thread.lastMessage}
+                              </span>
+                            )}
+                          </div>
+                        </SidebarMenuButton>
+                        <button
+                          onClick={(e) => deleteThread(thread.id, e)}
+                          className="absolute right-1 flex h-6 w-6 items-center justify-center rounded p-0 opacity-0 group-hover:opacity-100 hover:bg-sidebar-accent"
+                          title="Delete Chat"
+                        >
+                          <TrashIcon className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </SidebarMenuItem>
+                  ))
+                )}
               </SidebarMenu>
             </SidebarGroup>
           </SidebarContent>
@@ -383,33 +538,60 @@ export const Assistant = () => {
           <div className="flex flex-1 flex-col overflow-hidden">
             {/* Messages */}
             <div className="flex-1 space-y-4 overflow-y-auto p-4">
-              {messages.length === 0 && (
+              {isLoadingMessages && (
                 <div className="flex h-full flex-col items-center justify-center text-center">
-                  <h2 className="mb-2 text-2xl font-semibold">
-                    Welcome to your AI Tutor!
-                  </h2>
+                  <div className="mb-2 text-lg font-semibold">
+                    Loading messages...
+                  </div>
                   <p className="text-muted-foreground">
-                    Ready to learn? Ask me anything!
+                    Fetching conversation history
                   </p>
                 </div>
               )}
 
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-3xl px-4 py-2 ${
-                      message.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-foreground"
-                    }`}
-                  >
-                    {message.content}
+              {!isLoadingMessages &&
+                messages.length === 0 &&
+                !currentThreadId && (
+                  <div className="flex h-full flex-col items-center justify-center text-center">
+                    <h2 className="mb-2 text-2xl font-semibold">
+                      Welcome to your AI Tutor!
+                    </h2>
+                    <p className="text-muted-foreground">
+                      Ready to learn? Ask me anything!
+                    </p>
                   </div>
-                </div>
-              ))}
+                )}
+
+              {!isLoadingMessages &&
+                messages.length === 0 &&
+                currentThreadId && (
+                  <div className="flex h-full flex-col items-center justify-center text-center">
+                    <h2 className="mb-2 text-xl font-semibold">
+                      No messages yet
+                    </h2>
+                    <p className="text-muted-foreground">
+                      This conversation is empty
+                    </p>
+                  </div>
+                )}
+
+              {!isLoadingMessages &&
+                messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-3xl px-4 py-2 ${
+                        message.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-foreground"
+                      }`}
+                    >
+                      {message.content}
+                    </div>
+                  </div>
+                ))}
 
               {isLoading && (
                 <div className="flex justify-start">

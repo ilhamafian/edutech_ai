@@ -1,7 +1,7 @@
 import os
 import json
 import base64
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -15,6 +15,7 @@ from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from langchain import hub
 
 import boto3
+from database.database import get_dynamodb_resource
 
 load_dotenv()
 
