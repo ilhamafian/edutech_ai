@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -183,6 +183,31 @@ export const Assistant = () => {
       sendMessage();
     }
   };
+
+  const getThreads = async () => {
+    try {
+      console.log("Getting threads");
+      const requestBody = {
+        user_id: "1",
+        id:"1"
+      }
+      console.log("Request body", requestBody);
+      const response = await fetch("https://ywcdy4t13i.execute-api.us-east-1.amazonaws.com/dev/qna", {
+        method: "POST",
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+      console.log("Data", data);
+      setThreads(data);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  useEffect(() => {
+    getThreads();
+  }, []);
 
   return (
     <SidebarProvider>
