@@ -507,7 +507,7 @@ export const Assistant = () => {
             </Breadcrumb>
           </header>
 
-          <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="mx-auto flex max-w-5xl flex-1 flex-col overflow-hidden">
             {/* Messages */}
             <div className="flex-1 space-y-4 overflow-y-auto p-4">
               {isLoadingMessages && (
