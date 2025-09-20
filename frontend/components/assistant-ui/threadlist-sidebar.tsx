@@ -52,36 +52,27 @@ export function ThreadListSidebar({
       </SidebarHeader>
       <SidebarContent className="aui-sidebar-content px-2">
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-          <SidebarMenu className="space-y-1">
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                className="hover:bg-muted data-active:bg-muted"
-              >
-                <Link href="/">
-                  <BookOpen className="size-4" />
-                  <span>Ask AI</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                className="hover:bg-muted data-active:bg-muted"
-              >
-                <Link href="/quiz">
-                  <ListCheck className="size-4" />
-                  <span>Quiz</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton className="hover:bg-muted data-active:bg-muted">
-                <ChartLine className="size-4" />
-                <span>Analytics</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
+        <SidebarGroupLabel>Tools</SidebarGroupLabel>
+              <SidebarMenu className="space-y-1">
+                <SidebarMenuItem>
+                  <SidebarMenuButton>
+                    <BookOpen className="size-4"/>
+                    <span>Ask AI</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton>
+                    <ListCheck className="size-4"/>
+                    <span>Quiz</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton>
+                    <ChartLine className="size-4"/>
+                    <span>Analytics</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
         </SidebarGroup>
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
           <SidebarGroupLabel>Chats</SidebarGroupLabel>
