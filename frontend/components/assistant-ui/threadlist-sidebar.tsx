@@ -1,5 +1,11 @@
 import * as React from "react";
-import { BookOpen, ChartLine, Github, ListCheck, MessagesSquare } from "lucide-react";
+import {
+  BookOpen,
+  ChartLine,
+  Github,
+  ListCheck,
+  MessagesSquare,
+} from "lucide-react";
 import Link from "next/link";
 import {
   Sidebar,
@@ -14,8 +20,6 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { ThreadList } from "@/components/assistant-ui/thread-list";
-import { Button } from "../ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
 export function ThreadListSidebar({
   ...props
@@ -28,7 +32,7 @@ export function ThreadListSidebar({
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild>
                 <Link
-                  href="https://assistant-ui.com"
+                  href="http://localhost:3000"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -48,26 +52,36 @@ export function ThreadListSidebar({
       </SidebarHeader>
       <SidebarContent className="aui-sidebar-content px-2">
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-              <SidebarMenu className="space-y-1">
-                <SidebarMenuItem>
-                  <SidebarMenuButton className="hover:bg-muted data-active:bg-muted">
-                    <BookOpen className="size-4"/>
-                    <span>Ask AI</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton className="hover:bg-muted data-active:bg-muted">
-                    <ListCheck className="size-4"/>
-                    <span>Quiz</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton className="hover:bg-muted data-active:bg-muted">
-                    <ChartLine className="size-4"/>
-                    <span>Analytics</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
+          <SidebarMenu className="space-y-1">
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                className="hover:bg-muted data-active:bg-muted"
+              >
+                <Link href="/">
+                  <BookOpen className="size-4" />
+                  <span>Ask AI</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                className="hover:bg-muted data-active:bg-muted"
+              >
+                <Link href="/quiz">
+                  <ListCheck className="size-4" />
+                  <span>Quiz</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton className="hover:bg-muted data-active:bg-muted">
+                <ChartLine className="size-4" />
+                <span>Analytics</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </SidebarGroup>
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
           <SidebarGroupLabel>Chats</SidebarGroupLabel>
