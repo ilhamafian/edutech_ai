@@ -48,7 +48,7 @@ export const Assistant = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Ask AI
+                      Ask Tutor
                     </BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="hidden md:block" />
@@ -59,7 +59,6 @@ export const Assistant = () => {
               </Breadcrumb>
             </header>
             <div className="flex-1 overflow-hidden">
-              
               <Thread />
             </div>
           </SidebarInset>
