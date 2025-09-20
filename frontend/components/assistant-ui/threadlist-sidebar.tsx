@@ -31,11 +31,7 @@ export function ThreadListSidebar({
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild>
-                <Link
-                  href="http://localhost:3000"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
+                <Link href="http://localhost:3000" rel="noopener noreferrer">
                   <div className="aui-sidebar-header-icon-wrapper flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                     <MessagesSquare className="aui-sidebar-header-icon size-4" />
                   </div>
