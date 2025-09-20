@@ -55,21 +55,27 @@ export function ThreadListSidebar({
         <SidebarGroupLabel>Tools</SidebarGroupLabel>
               <SidebarMenu className="space-y-1">
                 <SidebarMenuItem>
-                  <SidebarMenuButton>
-                    <BookOpen className="size-4"/>
-                    <span>Ask AI</span>
+                  <SidebarMenuButton asChild>
+                    <Link href="/">
+                      <BookOpen className="size-4"/>
+                      <span>Ask AI</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton>
-                    <ListCheck className="size-4"/>
-                    <span>Quiz</span>
+                  <SidebarMenuButton asChild>
+                    <Link href="/quiz">
+                      <ListCheck className="size-4"/>
+                      <span>Quiz</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton>
+                  <SidebarMenuButton asChild>
+                    <Link href="/analytics">
                     <ChartLine className="size-4"/>
-                    <span>Analytics</span>
+                      <span>Analytics</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
