@@ -37,7 +37,7 @@ export function ThreadListSidebar({
                   </div>
                   <div className="aui-sidebar-header-heading mr-6 flex flex-col gap-0.5 leading-none">
                     <span className="aui-sidebar-header-title font-semibold">
-                      assistant-ui
+                      TemanTutor
                     </span>
                   </div>
                 </Link>
@@ -54,7 +54,7 @@ export function ThreadListSidebar({
                   <SidebarMenuButton asChild>
                     <Link href="/">
                       <BookOpen className="size-4"/>
-                      <span>Ask AI</span>
+                      <span>Ask Tutor</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

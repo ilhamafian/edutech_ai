@@ -89,7 +89,7 @@ const ThreadWelcome: FC = () => {
               exit={{ opacity: 0, y: 10 }}
               className="aui-thread-welcome-message-motion-1 text-2xl font-semibold"
             >
-              Hello there!
+              Welcome to your AI Tutor!
             </m.div>
             <m.div
               initial={{ opacity: 0, y: 10 }}
@@ -98,7 +98,7 @@ const ThreadWelcome: FC = () => {
               transition={{ delay: 0.1 }}
               className="aui-thread-welcome-message-motion-2 text-2xl text-muted-foreground/65"
             >
-              How can I help you today?
+              Ready to learn? Ask me anything!
             </m.div>
           </div>
         </div>
@@ -112,24 +112,24 @@ const ThreadWelcomeSuggestions: FC = () => {
     <div className="aui-thread-welcome-suggestions grid w-full gap-2 @md:grid-cols-2">
       {[
         {
-          title: "What's the weather",
-          label: "in San Francisco?",
-          action: "What's the weather in San Francisco?",
+          title: "What's the function of a CPU",
+          label: "inside a computer?",
+          action: "What's the function of a CPU inside a computer?",
         },
         {
-          title: "Explain React hooks",
-          label: "like useState and useEffect",
-          action: "Explain React hooks like useState and useEffect",
+          title: "Explain how binary search works",
+          label: "in an array",
+          action: "Explain how binary search works in an array",
         },
         {
-          title: "Write a SQL query",
-          label: "to find top customers",
-          action: "Write a SQL query to find top customers",
+          title: "How to write a SQL query",
+          label: "to find all users in a database",
+          action: "Write a SQL query to find all customers in a database",
         },
         {
-          title: "Create a meal plan",
-          label: "for healthy weight loss",
-          action: "Create a meal plan for healthy weight loss",
+          title: "Explain object-oriented programming",
+          label: "concepts and principles",
+          action: "Explain object-oriented programming concepts and principles",
         },
       ].map((suggestedAction, index) => (
         <m.div
