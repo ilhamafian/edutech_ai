@@ -30,26 +30,47 @@ export async function POST(req: Request) {
       userMessage = (lastMessage as any).content || "";
     }
 
+    console.log("User message", userMessage);
+
     // Call FastAPI backend to get the response
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const backendResponse = await fetch(`${apiUrl}/api/orchestrator`, {
+    const apiUrl = 'https://ywcdy4t13i.execute-api.us-east-1.amazonaws.com/dev/qna';
+    const backendResponse = await fetch(`${apiUrl}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: userMessage }),
+      body: JSON.stringify({ prompt: userMessage }),
     });
 
+    console.log("Backend response", backendResponse);
+
     if (!backendResponse.ok) {
-      throw new Error("Backend error");
+      const errorText = await backendResponse.text();
+      console.error("Backend error details:", backendResponse.status, errorText);
+      throw new Error(`Backend error: ${backendResponse.status} - ${errorText}`);
     }
 
     const backendData = await backendResponse.json();
+    console.log("Backend data:", backendData);
+
+    // Parse the body if it's a string
+    let responseContent = "No response received";
+    if (backendData.body) {
+      try {
+        const parsedBody = JSON.parse(backendData.body);
+        responseContent = parsedBody.response || parsedBody.output || parsedBody.answer;
+      } catch (parseError) {
+        console.error("Error parsing backend body:", parseError);
+        responseContent = backendData.body; // Use raw body if parsing fails
+      }
+    } else if (backendData.output || backendData.response || backendData.answer) {
+      responseContent = backendData.output || backendData.response || backendData.answer;
+    }
 
     // Return simple JSON response
     return new Response(
       JSON.stringify({
         id: Date.now().toString(),
         role: "assistant",
-        content: backendData.output,
+        content: responseContent,
       }),
       {
         status: 200,
