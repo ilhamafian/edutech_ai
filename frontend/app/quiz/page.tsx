@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import {
   useChatRuntime,
@@ -31,18 +32,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 
 // Define subjects and their quiz options
 const subjects = {
-  math: {
+  "komputer-sains-spm": {
     name: "SPM Computer Science",
     icon: Code,
     color: "bg-blue-500",
     quizzes: [
-      "Pengkomputeran",
-      "Pangkalan Data Lanjutan",
-      "Pengaturcaraan Berasaskan WebChapter 3",
+      "1-pengkomputeran",
+      "2-pangkalan-data-lanjutan",
+      "3-pengaturcaraan-berasaskan-web",
     ],
   },
 };
@@ -52,13 +52,14 @@ type SubjectKey = keyof typeof subjects;
 interface QuizConfig {
   subject: string;
   quizName: string;
-  totalQuestions: number;
   difficulty: string;
 }
 
 export default function QuizPage() {
+  const router = useRouter();
   const [currentSubject, setCurrentSubject] = useState<SubjectKey | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [selectedQuiz, setSelectedQuiz] = useState<{
     subject: string;
     quiz: string;
@@ -66,7 +67,6 @@ export default function QuizPage() {
   const [quizConfig, setQuizConfig] = useState<QuizConfig>({
     subject: "",
     quizName: "",
-    totalQuestions: 10,
     difficulty: "medium",
   });
 
@@ -89,16 +89,69 @@ export default function QuizPage() {
     setQuizConfig({
       subject: subjectKey,
       quizName: quizName,
-      totalQuestions: 10,
       difficulty: "medium",
     });
     setIsModalOpen(true);
   };
 
-  const handleStartQuiz = () => {
-    console.log("Starting quiz with config:", quizConfig);
-    // Here you would navigate to the actual quiz or make an API call
-    setIsModalOpen(false);
+  const handleStartQuiz = async () => {
+    setIsGenerating(true);
+
+    try {
+      // Prepare the data in the format expected by Lambda
+      const quizData = {
+        subject: "komputer sains spm", // Static for now, but could be dynamic
+        chapter: selectedQuiz?.quiz || "",
+        difficulty: quizConfig.difficulty,
+        user_id: "1", // Hardcoded user ID for now
+      };
+
+      console.log("Starting quiz with config:", quizData);
+
+      // Call the quiz generation API
+      const response = await fetch("/api/quiz", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(quizData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate quiz");
+      }
+
+      const generatedQuiz = await response.json();
+      console.log("Generated quiz:", generatedQuiz);
+
+      // Extract the quiz ID from the Lambda response
+      // The Lambda function should return the quiz_id it created in DynamoDB
+      let quizId;
+      if (generatedQuiz.quiz_id) {
+        quizId = generatedQuiz.quiz_id;
+      } else if (generatedQuiz.id) {
+        quizId = generatedQuiz.id;
+      } else {
+        // Fallback to timestamp if no ID is found in response
+        quizId = Date.now().toString();
+        console.warn(
+          "No quiz ID found in Lambda response, using timestamp fallback",
+        );
+      }
+
+      // Store the quiz data in sessionStorage with the actual quiz ID
+      sessionStorage.setItem(`quiz-${quizId}`, JSON.stringify(generatedQuiz));
+
+      // Navigate to the quiz page using the actual quiz ID
+      router.push(`/quiz/${quizId}`);
+    } catch (error) {
+      console.error("Error generating quiz:", error);
+      alert("Failed to generate quiz. Please try again.");
+    } finally {
+      setIsGenerating(false);
+      setIsModalOpen(false);
+    }
   };
 
   const handleModalClose = () => {
@@ -234,28 +287,6 @@ export default function QuizPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <label
-                  htmlFor="total-questions"
-                  className="text-right text-sm font-medium"
-                >
-                  Total Questions
-                </label>
-                <Input
-                  id="total-questions"
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={quizConfig.totalQuestions}
-                  onChange={(e) =>
-                    setQuizConfig({
-                      ...quizConfig,
-                      totalQuestions: parseInt(e.target.value) || 1,
-                    })
-                  }
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label
                   htmlFor="difficulty"
                   className="text-right text-sm font-medium"
                 >
@@ -279,10 +310,16 @@ export default function QuizPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={handleModalClose}>
+              <Button
+                variant="outline"
+                onClick={handleModalClose}
+                disabled={isGenerating}
+              >
                 Cancel
               </Button>
-              <Button onClick={handleStartQuiz}>Start Quiz</Button>
+              <Button onClick={handleStartQuiz} disabled={isGenerating}>
+                {isGenerating ? "Generating Quiz..." : "Start Quiz"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
