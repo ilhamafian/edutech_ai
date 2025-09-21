@@ -93,20 +93,28 @@ export default function QuizDetailPage() {
   // Function to fetch quiz data from GET lambda function
   const fetchQuizFromAPI = async (id: string): Promise<QuizData | null> => {
     try {
-      console.log("Fetching quiz data from GET lambda for ID:", id);
+      console.log("Fetching quiz data from Lambda memories for ID:", id);
       const response = await fetch(`/api/quiz?quiz_id=${id}`);
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Failed to fetch quiz: ${response.status} - ${errorText}`);
         throw new Error(`Failed to fetch quiz: ${response.status}`);
       }
 
       const quizData = await response.json();
-      console.log("Fetched quiz data from GET lambda:", quizData);
+      console.log("Fetched quiz data from Lambda memories:", quizData);
 
-      // Return the quiz data from the new GET lambda function
+      // Ensure the quiz data has the expected structure
+      if (!quizData || (!quizData.questions && !quizData.quiz_content)) {
+        console.error("Invalid quiz data structure:", quizData);
+        return null;
+      }
+
+      // Return the quiz data from the Lambda memories function
       return quizData;
     } catch (error) {
-      console.error("Error fetching quiz from GET lambda:", error);
+      console.error("Error fetching quiz from Lambda memories:", error);
       return null;
     }
   };
@@ -158,6 +166,7 @@ export default function QuizDetailPage() {
                     userAnswer_before: userAnswer,
                     options: q.options,
                     correct_answer: q.correct_answer,
+                    status: q.status,
                   });
 
                   // If user_selected is completely missing/undefined, we can't recover it
@@ -170,7 +179,7 @@ export default function QuizDetailPage() {
                     );
                   }
 
-                  // Handle different formats of user_selected
+                  // Handle different formats of user_selected from Lambda memories
                   if (userAnswer && q.options) {
                     // Case 1: user_selected is already in full format (e.g., "A) Answer text")
                     const directMatch = q.options.find(
@@ -232,7 +241,7 @@ export default function QuizDetailPage() {
               );
               setSelectedAnswers(completedAnswers);
               console.log(
-                "Final selectedAnswers for completed quiz:",
+                "Final selectedAnswers for completed quiz from Lambda memories:",
                 completedAnswers,
               );
             }
@@ -261,7 +270,7 @@ export default function QuizDetailPage() {
 
         // Check if quiz is completed (has status = "completed") and show results
         if (apiQuizData.status === "completed") {
-          console.log("API Quiz is completed, showing results");
+          console.log("API Quiz from Lambda memories is completed, showing results");
           setShowResults(true);
           // Set selected answers from completed quiz data
           if (Array.isArray(apiQuizData.questions)) {
@@ -274,6 +283,7 @@ export default function QuizDetailPage() {
                   userAnswer_before: userAnswer,
                   options: q.options,
                   correct_answer: q.correct_answer,
+                  status: q.status,
                 });
 
                 // If user_selected is completely missing/undefined, we can't recover it
@@ -283,7 +293,7 @@ export default function QuizDetailPage() {
                   );
                 }
 
-                // Handle different formats of user_selected
+                // Handle different formats of user_selected from Lambda memories
                 if (userAnswer && q.options) {
                   // Case 1: user_selected is already in full format (e.g., "A) Answer text")
                   const directMatch = q.options.find(
@@ -347,7 +357,7 @@ export default function QuizDetailPage() {
             );
             setSelectedAnswers(completedAnswers);
             console.log(
-              "Final selectedAnswers for completed API quiz:",
+              "Final selectedAnswers for completed API quiz from Lambda memories:",
               completedAnswers,
             );
           }
@@ -987,9 +997,6 @@ export default function QuizDetailPage() {
                       >
                         <ChevronLeft className="mr-2 h-4 w-4" />
                         Back to Quiz Selection
-                      </Button>
-                      <Button onClick={() => window.location.reload()}>
-                        Retake Quiz
                       </Button>
                     </div>
                   </CardContent>

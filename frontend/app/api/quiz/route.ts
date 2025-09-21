@@ -19,6 +19,8 @@ interface LambdaQuestion {
   options: { [key: string]: string };
   answer: string;
   explanation?: string;
+  user_selected?: string;
+  status?: boolean;
 }
 
 export async function GET(request: NextRequest) {
@@ -31,12 +33,12 @@ export async function GET(request: NextRequest) {
     if (quizId) {
       try {
         const lambdaUrl =
-          process.env.LAMBDA_QUIZ_ENDPOINT ||
-          "https://ywcdy4t13i.execute-api.us-east-1.amazonaws.com/dev/exam";
+          process.env.LAMBDA_QUIZ_MEMORIES_ENDPOINT ||
+          "https://ywcdy4t13i.execute-api.us-east-1.amazonaws.com/dev/exam/result";
 
-        console.log("Fetching quiz from Lambda:", quizId);
+        console.log("Fetching quiz from Lambda memories:", quizId);
 
-        // Call Lambda to get quiz data
+        // Call Lambda to get quiz data using the new endpoint
         const lambdaResponse = await fetch(`${lambdaUrl}?id=${quizId}`, {
           method: "GET",
           headers: {
@@ -53,8 +55,9 @@ export async function GET(request: NextRequest) {
         }
 
         const lambdaData = await lambdaResponse.json();
-        console.log("Retrieved quiz from Lambda:", lambdaData);
+        console.log("Retrieved quiz from Lambda memories:", lambdaData);
 
+        // The Lambda function returns the quiz data directly from DynamoDB
         // Transform the quiz data to frontend format
         let questions = [];
         if (lambdaData.quiz_content && lambdaData.quiz_content.quiz) {
@@ -77,6 +80,8 @@ export async function GET(request: NextRequest) {
               options: optionsArray,
               correct_answer: correct_answer,
               explanation: q.explanation || "",
+              user_selected: q.user_selected || "",
+              status: q.status,
             };
           });
         }
@@ -91,6 +96,10 @@ export async function GET(request: NextRequest) {
           title: `${lambdaData.subject || "Quiz"} - ${lambdaData.chapter || "Unknown"} Quiz`,
           created_at: lambdaData.created_at || new Date().toISOString(),
           status: lambdaData.status || "completed",
+          score: lambdaData.score,
+          duration: lambdaData.duration,
+          feedback: lambdaData.feedback,
+          completed_at: lambdaData.completed_at,
         };
 
         return NextResponse.json(transformedQuiz);
@@ -339,7 +348,7 @@ async function handleQuizSubmission(body: {
 
     console.log("Validation passed, calling Lambda...");
 
-    // Call Lambda function to submit quiz (same endpoint as generation)
+    // Call Lambda function to submit quiz (use the original quiz endpoint for submission)
     const lambdaUrl =
       process.env.LAMBDA_QUIZ_ENDPOINT ||
       "https://ywcdy4t13i.execute-api.us-east-1.amazonaws.com/dev/exam";
