@@ -23,6 +23,15 @@ import {
 } from "@/components/ui/breadcrumb";
 import { ChevronLeft, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 // Define subjects and their quiz options
 const subjects = {
@@ -31,22 +40,35 @@ const subjects = {
     icon: Code,
     color: "bg-blue-500",
     quizzes: [
-      "Chapter 1",
-      "Chapter 2",
-      "Chapter 3",
-      "Chapter 4",
-      "Chapter 5",
-      "Chapter 6",
-      "Chapter 7",
-      "Chapter 8",
+      "Pengkomputeran",
+      "Pangkalan Data Lanjutan",
+      "Pengaturcaraan Berasaskan WebChapter 3",
     ],
   },
 };
 
 type SubjectKey = keyof typeof subjects;
 
+interface QuizConfig {
+  subject: string;
+  quizName: string;
+  totalQuestions: number;
+  difficulty: string;
+}
+
 export default function QuizPage() {
   const [currentSubject, setCurrentSubject] = useState<SubjectKey | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedQuiz, setSelectedQuiz] = useState<{
+    subject: string;
+    quiz: string;
+  } | null>(null);
+  const [quizConfig, setQuizConfig] = useState<QuizConfig>({
+    subject: "",
+    quizName: "",
+    totalQuestions: 10,
+    difficulty: "medium",
+  });
 
   const runtime = useChatRuntime({
     transport: new AssistantChatTransport({
@@ -60,6 +82,28 @@ export default function QuizPage() {
 
   const handleBackToSubjects = () => {
     setCurrentSubject(null);
+  };
+
+  const handleQuizClick = (subjectKey: string, quizName: string) => {
+    setSelectedQuiz({ subject: subjectKey, quiz: quizName });
+    setQuizConfig({
+      subject: subjectKey,
+      quizName: quizName,
+      totalQuestions: 10,
+      difficulty: "medium",
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleStartQuiz = () => {
+    console.log("Starting quiz with config:", quizConfig);
+    // Here you would navigate to the actual quiz or make an API call
+    setIsModalOpen(false);
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setSelectedQuiz(null);
   };
 
   const renderBreadcrumb = () => {
@@ -118,7 +162,7 @@ export default function QuizPage() {
                 <div
                   key={index}
                   className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border bg-card p-6 font-medium text-muted-foreground shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md"
-                  onClick={() => console.log(`Starting ${quiz} quiz`)}
+                  onClick={() => handleQuizClick(currentSubject, quiz)}
                 >
                   <div className={`rounded-lg p-3 ${subject.color} text-white`}>
                     <IconComponent className="h-6 w-6" />
@@ -175,6 +219,73 @@ export default function QuizPage() {
             <div className="flex-1 p-6">{renderContent()}</div>
           </SidebarInset>
         </div>
+
+        {/* Quiz Configuration Modal */}
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Configure Quiz</DialogTitle>
+              <DialogDescription>
+                Set up your quiz for &quot;{selectedQuiz?.quiz}&quot; in{" "}
+                {selectedQuiz &&
+                  subjects[selectedQuiz.subject as SubjectKey]?.name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label
+                  htmlFor="total-questions"
+                  className="text-right text-sm font-medium"
+                >
+                  Total Questions
+                </label>
+                <Input
+                  id="total-questions"
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={quizConfig.totalQuestions}
+                  onChange={(e) =>
+                    setQuizConfig({
+                      ...quizConfig,
+                      totalQuestions: parseInt(e.target.value) || 1,
+                    })
+                  }
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label
+                  htmlFor="difficulty"
+                  className="text-right text-sm font-medium"
+                >
+                  Difficulty
+                </label>
+                <select
+                  id="difficulty"
+                  value={quizConfig.difficulty}
+                  onChange={(e) =>
+                    setQuizConfig({
+                      ...quizConfig,
+                      difficulty: e.target.value,
+                    })
+                  }
+                  className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={handleModalClose}>
+                Cancel
+              </Button>
+              <Button onClick={handleStartQuiz}>Start Quiz</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </SidebarProvider>
     </AssistantRuntimeProvider>
   );
