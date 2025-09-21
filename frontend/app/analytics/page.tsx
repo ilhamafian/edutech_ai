@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import {
   useChatRuntime,
@@ -25,47 +25,43 @@ import {
   Clock, 
   Target, 
   TrendingUp, 
-  AlertTriangle,
-  CheckCircle,
   Award,
   Brain
 } from "lucide-react";
 
-// Mock data for analytics
-const mockAnalyticsData = {
-  overallPerformance: {
-    totalQuizzes: 24,
-    averageScore: 78.5,
-    totalTimeSpent: 480, // minutes
-    improvementRate: 12.3,
-  },
-  recentQuizzes: [
-    { chapter: "Chapter 1", score: 85, timeSpent: 25, difficulty: "Easy", date: "2024-01-15" },
-    { chapter: "Chapter 2", score: 72, timeSpent: 32, difficulty: "Medium", date: "2024-01-14" },
-    { chapter: "Chapter 3", score: 90, timeSpent: 28, difficulty: "Easy", date: "2024-01-13" },
-    { chapter: "Chapter 4", score: 65, timeSpent: 45, difficulty: "Hard", date: "2024-01-12" },
-    { chapter: "Chapter 5", score: 88, timeSpent: 30, difficulty: "Medium", date: "2024-01-11" },
-  ],
-  timeAnalysis: {
-    averageTimePerQuiz: 30,
-    fastestCompletion: 18,
-    slowestCompletion: 52,
-    timeByDifficulty: {
-      easy: 22,
-      medium: 35,
-      hard: 48,
-    },
-  },
-  difficultyAnalysis: {
-    easy: { attempted: 8, correct: 7, accuracy: 87.5 },
-    medium: { attempted: 12, correct: 9, accuracy: 75.0 },
-    hard: { attempted: 4, correct: 2, accuracy: 50.0 },
-  },
-  strengths: ["Data Structures", "Algorithms", "Programming Logic"],
-  weaknesses: ["Database Management", "Network Security", "System Design"],
-};
+interface AnalyticsData {
+  total_quizzes: number;
+  average_score: number;
+  total_time_seconds: number;
+  improvement_vs_previous_quiz: number;
+  recent_quiz_performance: {
+    score: number;
+    time_seconds: number;
+    level: string;
+  };
+  time_analysis: {
+    average_time_per_quiz: number;
+    fastest_completion_seconds: number;
+    slowest_completion_seconds: number;
+    time_by_difficulty: {
+      [key: string]: {
+        average_time_seconds: number;
+      };
+    };
+  };
+  question_difficulty_analysis: {
+    [key: string]: {
+      correct_answers: number;
+      total_questions: number;
+      accuracy_percentage: number;
+    };
+  };
+}
 
 export default function AnalyticsPage() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+
   const runtime = useChatRuntime({
     transport: new AssistantChatTransport({
       api: "/api/chat",
@@ -91,6 +87,24 @@ export default function AnalyticsPage() {
     return "text-red-600";
   };
 
+  const getAnalyticsData = async () => {
+    try {
+        setIsLoading(true);
+        const response = await fetch("/api/analytics?user_id=1");
+        const data = await response.json() as AnalyticsData;
+        console.log("Analytics data:", data);
+        setAnalyticsData(data);
+    } catch (error) {
+        console.error("Error fetching analytics data:", error);
+    }finally{
+        setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    getAnalyticsData();
+  }, []);
+
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <SidebarProvider>
@@ -110,185 +124,162 @@ export default function AnalyticsPage() {
             </header>
             
             <div className="flex-1 p-6 space-y-6">
-              {/* Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Quizzes</p>
-                      <p className="text-2xl font-bold">{mockAnalyticsData.overallPerformance.totalQuizzes}</p>
-                    </div>
-                    <BarChart3 className="h-8 w-8 text-blue-500" />
-                  </div>
-                </Card>
-
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Average Score</p>
-                      <p className="text-2xl font-bold">{mockAnalyticsData.overallPerformance.averageScore}%</p>
-                    </div>
-                    <Target className="h-8 w-8 text-green-500" />
-                  </div>
-                </Card>
-
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Time</p>
-                      <p className="text-2xl font-bold">{Math.floor(mockAnalyticsData.overallPerformance.totalTimeSpent / 60)}h {mockAnalyticsData.overallPerformance.totalTimeSpent % 60}m</p>
-                    </div>
-                    <Clock className="h-8 w-8 text-orange-500" />
-                  </div>
-                </Card>
-
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Improvement</p>
-                      <p className="text-2xl font-bold">+{mockAnalyticsData.overallPerformance.improvementRate}%</p>
-                    </div>
-                    <TrendingUp className="h-8 w-8 text-purple-500" />
-                  </div>
-                </Card>
-              </div>
-
-              {/* Recent Quiz Performance */}
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <Award className="h-5 w-5" />
-                  Recent Quiz Performance
-                </h3>
-                <div className="space-y-3">
-                  {mockAnalyticsData.recentQuizzes.map((quiz, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-3 h-3 rounded-full ${getDifficultyColor(quiz.difficulty)}`}></div>
-                        <div>
-                          <p className="font-medium">{quiz.chapter}</p>
-                          <p className="text-sm text-muted-foreground">{quiz.date}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-6">
-                        <div className="text-center">
-                          <p className={`font-bold ${getScoreColor(quiz.score)}`}>{quiz.score}%</p>
-                          <p className="text-xs text-muted-foreground">Score</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="font-medium">{quiz.timeSpent}m</p>
-                          <p className="text-xs text-muted-foreground">Time</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="font-medium text-sm">{quiz.difficulty}</p>
-                          <p className="text-xs text-muted-foreground">Level</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <p>Loading analytics data...</p>
                 </div>
-              </Card>
+              ) : analyticsData ? (
+                <>
+                  {/* Overview Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Card className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Total Quizzes</p>
+                          <p className="text-2xl font-bold">{analyticsData.total_quizzes}</p>
+                        </div>
+                        <BarChart3 className="h-8 w-8 text-blue-500" />
+                      </div>
+                    </Card>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Time Analysis */}
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Time Analysis
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Average per Quiz</span>
-                      <span className="font-medium">{mockAnalyticsData.timeAnalysis.averageTimePerQuiz} minutes</span>
+                    <Card className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Average Score</p>
+                          <p className="text-2xl font-bold">{analyticsData.average_score.toFixed(1)}%</p>
+                        </div>
+                        <Target className="h-8 w-8 text-green-500" />
+                      </div>
+                    </Card>
+
+                    <Card className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Total Time</p>
+                          <p className="text-2xl font-bold">{Math.floor(analyticsData.total_time_seconds / 60)}m {analyticsData.total_time_seconds % 60}s</p>
+                        </div>
+                        <Clock className="h-8 w-8 text-orange-500" />
+                      </div>
+                    </Card>
+
+                    <Card className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Improvement</p>
+                          <p className="text-2xl font-bold">+{analyticsData.improvement_vs_previous_quiz}%</p>
+                        </div>
+                        <TrendingUp className="h-8 w-8 text-purple-500" />
+                      </div>
+                    </Card>
+                  </div>
+
+                  {/* Recent Quiz Performance */}
+                  <Card className="p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Award className="h-5 w-5" />
+                      Recent Quiz Performance
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-3 h-3 rounded-full ${getDifficultyColor(analyticsData.recent_quiz_performance.level)}`}></div>
+                          <div>
+                            <p className="font-medium">Latest Quiz</p>
+                            <p className="text-sm text-muted-foreground">Most recent attempt</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          <div className="text-center">
+                            <p className={`font-bold ${getScoreColor(analyticsData.recent_quiz_performance.score)}`}>{analyticsData.recent_quiz_performance.score}%</p>
+                            <p className="text-xs text-muted-foreground">Score</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="font-medium">{analyticsData.recent_quiz_performance.time_seconds}s</p>
+                            <p className="text-xs text-muted-foreground">Time</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="font-medium text-sm capitalize">{analyticsData.recent_quiz_performance.level}</p>
+                            <p className="text-xs text-muted-foreground">Level</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Fastest Completion</span>
-                      <span className="font-medium text-green-600">{mockAnalyticsData.timeAnalysis.fastestCompletion} minutes</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Slowest Completion</span>
-                      <span className="font-medium text-red-600">{mockAnalyticsData.timeAnalysis.slowestCompletion} minutes</span>
-                    </div>
-                    
-                    <div className="pt-4 border-t">
-                      <p className="text-sm font-medium mb-3">Time by Difficulty</p>
-                      <div className="space-y-2">
-                        {Object.entries(mockAnalyticsData.timeAnalysis.timeByDifficulty).map(([level, time]) => (
-                          <div key={level} className="flex items-center gap-3">
-                            <div className={`w-3 h-3 rounded-full ${getDifficultyColor(level)}`}></div>
-                            <span className="text-sm capitalize flex-1">{level}</span>
-                            <span className="font-medium">{time}m</span>
+                  </Card>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Time Analysis */}
+                    <Card className="p-6">
+                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <Clock className="h-5 w-5" />
+                        Time Analysis
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">Average per Quiz</span>
+                          <span className="font-medium">{analyticsData.time_analysis.average_time_per_quiz.toFixed(1)} seconds</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">Fastest Completion</span>
+                          <span className="font-medium text-green-600">{analyticsData.time_analysis.fastest_completion_seconds} seconds</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-muted-foreground">Slowest Completion</span>
+                          <span className="font-medium text-red-600">{analyticsData.time_analysis.slowest_completion_seconds} seconds</span>
+                        </div>
+                        
+                        <div className="pt-4 border-t">
+                          <p className="text-sm font-medium mb-3">Time by Difficulty</p>
+                          <div className="space-y-2">
+                            {Object.entries(analyticsData.time_analysis.time_by_difficulty).map(([level, data]) => (
+                              <div key={level} className="flex items-center gap-3">
+                                <div className={`w-3 h-3 rounded-full ${getDifficultyColor(level)}`}></div>
+                                <span className="text-sm capitalize flex-1">{level}</span>
+                                <span className="font-medium">{data.average_time_seconds}s</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+
+                    {/* Question Difficulty Analysis */}
+                    <Card className="p-6">
+                      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <Brain className="h-5 w-5" />
+                        Question Difficulty Analysis
+                      </h3>
+                      <div className="space-y-4">
+                        {Object.entries(analyticsData.question_difficulty_analysis).map(([level, stats]) => (
+                          <div key={level} className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-3 h-3 rounded-full ${getDifficultyColor(level)}`}></div>
+                                <span className="font-medium capitalize">{level}</span>
+                              </div>
+                              <span className={`font-bold ${getScoreColor(stats.accuracy_percentage)}`}>
+                                {stats.accuracy_percentage}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className={`h-2 rounded-full ${getDifficultyColor(level)}`}
+                                style={{ width: `${stats.accuracy_percentage}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {stats.correct_answers}/{stats.total_questions} questions correct
+                            </p>
                           </div>
                         ))}
                       </div>
-                    </div>
+                    </Card>
                   </div>
-                </Card>
-
-                {/* Question Difficulty Analysis */}
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Brain className="h-5 w-5" />
-                    Question Difficulty Analysis
-                  </h3>
-                  <div className="space-y-4">
-                    {Object.entries(mockAnalyticsData.difficultyAnalysis).map(([level, stats]) => (
-                      <div key={level} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-3 h-3 rounded-full ${getDifficultyColor(level)}`}></div>
-                            <span className="font-medium capitalize">{level}</span>
-                          </div>
-                          <span className={`font-bold ${getScoreColor(stats.accuracy)}`}>
-                            {stats.accuracy}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className={`h-2 rounded-full ${getDifficultyColor(level)}`}
-                            style={{ width: `${stats.accuracy}%` }}
-                          ></div>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {stats.correct}/{stats.attempted} questions correct
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              </div>
-
-              {/* Strengths and Weaknesses */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                    Strengths
-                  </h3>
-                  <div className="space-y-2">
-                    {mockAnalyticsData.strengths.map((strength, index) => (
-                      <div key={index} className="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-sm">{strength}</span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-orange-500" />
-                    Areas for Improvement
-                  </h3>
-                  <div className="space-y-2">
-                    {mockAnalyticsData.weaknesses.map((weakness, index) => (
-                      <div key={index} className="flex items-center gap-2 p-2 bg-orange-50 rounded-lg">
-                        <AlertTriangle className="h-4 w-4 text-orange-500" />
-                        <span className="text-sm">{weakness}</span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              </div>
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <p>No analytics data available</p>
+                </div>
+              )}
             </div>
           </SidebarInset>
         </div>

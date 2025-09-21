@@ -118,21 +118,21 @@ export function NavigationSidebar({
 
       case "analytics":
         return [
-          {
-            id: "analytics-1",
-            title: "Weekly Performance Report",
-            createdAt: new Date("2024-01-15T09:00:00"),
-          },
-          {
-            id: "analytics-2",
-            title: "Learning Progress - January",
-            createdAt: new Date("2024-01-08T12:00:00"),
-          },
-          {
-            id: "analytics-3",
-            title: "Quiz Performance Analysis",
-            createdAt: new Date("2024-01-01T08:30:00"),
-          },
+          // {
+          //   id: "analytics-1",
+          //   title: "Weekly Performance Report",
+          //   createdAt: new Date("2024-01-15T09:00:00"),
+          // },
+          // {
+          //   id: "analytics-2",
+          //   title: "Learning Progress - January",
+          //   createdAt: new Date("2024-01-08T12:00:00"),
+          // },
+          // {
+          //   id: "analytics-3",
+          //   title: "Quiz Performance Analysis",
+          //   createdAt: new Date("2024-01-01T08:30:00"),
+          // },
         ];
 
       default:
