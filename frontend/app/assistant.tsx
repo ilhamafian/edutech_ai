@@ -12,31 +12,14 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarProvider,
   SidebarInset,
   SidebarTrigger,
-  SidebarRail,
 } from "@/components/ui/sidebar";
+import { NavigationSidebar } from "@/components/ui/navigation-sidebar";
 import { Separator } from "@/components/ui/separator";
 import {
   ArrowUpIcon,
-  BookOpen,
-  ChartLine,
-  Github,
-  ListCheck,
-  MessagesSquare,
-  MessageSquareIcon,
-  PlusIcon,
-  RefreshCwIcon,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -54,19 +37,10 @@ interface ChatThread {
 }
 
 interface DynamoDBChatItem {
-  id?: string; // session_id might be in id field
-  session_id?: string; // or in session_id field
-  user_id: string;
-  title?: string;
-  created_at?: string;
-  updated_at?: string;
-  messages?: Array<{
-    role: string;
-    content: string;
-    timestamp: string;
-  }>;
-  // Add other fields that might exist in your DynamoDB items
-  [key: string]: string | number | boolean | undefined | Array<unknown>;
+  id: string; // session_id 
+  title: string;
+  // Messages are no longer included in the chat history response
+  // They are fetched separately when clicking on a chat
 }
 
 export const Assistant = () => {
@@ -142,7 +116,7 @@ export const Assistant = () => {
       setCurrentThreadId(threadId);
 
       // If thread already has messages, use them, otherwise fetch from API
-      if (thread.messages.length > 0) {
+      if (thread.messages && thread.messages.length > 0) {
         setMessages(thread.messages);
       } else {
         const fetchedMessages = await fetchMessagesForSession(threadId);
@@ -303,43 +277,15 @@ export const Assistant = () => {
       const chatThreads: ChatThread[] = data.map((item, index) => {
         console.log(`Processing item ${index}:`, item);
 
-        // Handle both id and session_id fields from DynamoDB
-        const sessionId = item.id || item.session_id || "unknown-session";
-
-        // If messages are already included, we can cache them
-        const messages: Message[] = item.messages
-          ? item.messages.map(
-              (
-                msg: {
-                  role: string;
-                  content: string;
-                  timestamp: string;
-                },
-                msgIndex: number,
-              ) => ({
-                id: `${sessionId}-msg-${msgIndex}`,
-                role:
-                  msg.role === "agent"
-                    ? "assistant"
-                    : (msg.role as "user" | "assistant"),
-                content: msg.content,
-              }),
-            )
-          : [];
-
         return {
-          id: sessionId,
-          title:
-            item.title ||
-            "Chat " + (sessionId ? sessionId.slice(0, 8) : "unknown"),
-          messages: messages, // Use embedded messages if available
-          createdAt: item.created_at ? new Date(item.created_at) : new Date(),
+          id: item.id,
+          title: item.title,
+          messages: [], // Messages are fetched separately when user clicks on chat
+          createdAt: new Date(), // We don't have created_at in the simplified response
         };
       });
 
-      // Sort by creation date, newest first
-      chatThreads.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
+      // Keep the order as returned by the API (assuming it's already sorted)
       setThreads(chatThreads);
     } catch (error) {
       console.error("Error fetching chat histories:", error);
@@ -353,136 +299,14 @@ export const Assistant = () => {
   return (
     <SidebarProvider>
       <div className="flex h-dvh w-full pr-0.5">
-        {/* Custom Sidebar */}
-        <Sidebar>
-          <SidebarHeader className="mb-2 border-b">
-            <div className="flex items-center justify-between">
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton size="lg" asChild>
-                    <Link href="/">
-                      <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                        <MessagesSquare className="size-4" />
-                      </div>
-                      <div className="mr-6 flex flex-col gap-0.5 leading-none">
-                        <span className="font-semibold">TemanTutor</span>
-                      </div>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </div>
-          </SidebarHeader>
-
-          <SidebarContent className="px-2">
-            <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-              <SidebarGroupLabel>Tools</SidebarGroupLabel>
-              <SidebarMenu className="space-y-1">
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/">
-                      <BookOpen className="size-4" />
-                      <span>Ask Tutor</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/quiz">
-                      <ListCheck className="size-4" />
-                      <span>Quiz</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link href="/analytics">
-                      <ChartLine className="size-4" />
-                      <span>Analytics</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroup>
-
-            <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-              <div className="flex items-center justify-between">
-                <SidebarGroupLabel>Chats</SidebarGroupLabel>
-                <div className="flex gap-1">
-                  <Button
-                    onClick={createNewThread}
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0"
-                    title="New Chat"
-                  >
-                    <PlusIcon className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    onClick={getChatHistories}
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0"
-                    title="Refresh Chats"
-                  >
-                    <RefreshCwIcon className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <SidebarMenu className="space-y-1">
-                {threads.length === 0 ? (
-                  <div className="px-3 py-2 text-sm text-muted-foreground">
-                    No chat history yet
-                  </div>
-                ) : (
-                  threads.map((thread) => (
-                    <SidebarMenuItem key={thread.id}>
-                      <div className="group relative flex items-center">
-                        <SidebarMenuButton
-                          onClick={() => switchToThread(thread.id)}
-                          className={`flex-1 justify-start gap-2 ${
-                            currentThreadId === thread.id
-                              ? "bg-sidebar-accent"
-                              : ""
-                          }`}
-                        >
-                          <MessageSquareIcon className="size-4 flex-shrink-0" />
-                          <div className="flex min-w-0 flex-1 flex-col items-start">
-                            <span className="truncate text-sm font-medium">
-                              {thread.title}
-                            </span>
-                          </div>
-                        </SidebarMenuButton>
-                      </div>
-                    </SidebarMenuItem>
-                  ))
-                )}
-              </SidebarMenu>
-            </SidebarGroup>
-          </SidebarContent>
-
-          <SidebarRail />
-          <SidebarFooter className="border-t">
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton size="lg" asChild>
-                  <Link
-                    href="https://github.com/assistant-ui/assistant-ui"
-                    target="_blank"
-                  >
-                    <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                      <Github className="size-4" />
-                    </div>
-                    <div className="flex flex-col gap-0.5 leading-none">
-                      <span className="font-semibold">GitHub</span>
-                      <span>View Source</span>
-                    </div>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarFooter>
-        </Sidebar>
+        <NavigationSidebar  
+          module="chats"
+          currentId={currentThreadId}
+          onCreateNew={createNewThread}
+          onRefresh={getChatHistories}
+          onSwitch={switchToThread}
+          data={threads}
+        />
 
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">

@@ -3,14 +3,19 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronLeft, Clock, BookOpen } from "lucide-react";
+import { AssistantRuntimeProvider } from "@assistant-ui/react";
+import {
+  useChatRuntime,
+  AssistantChatTransport,
+} from "@assistant-ui/react-ai-sdk";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
+import { NavigationSidebar } from "@/components/ui/navigation-sidebar";
 import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
@@ -38,6 +43,12 @@ interface QuizData {
   [key: string]: unknown;
 }
 
+interface QuizThread {
+  id: string;
+  title: string;
+  createdAt: Date | string;
+}
+
 export default function QuizDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -47,10 +58,22 @@ export default function QuizDetailPage() {
   const [showResults, setShowResults] = useState(false);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Get quiz ID from params
+  const quizId = params.id as string;
+  
+  // State for sidebar functionality
+  const [isLoadingQuizzes, setIsLoadingQuizzes] = useState(false);
+  const [quizzes, setQuizzes] = useState<QuizThread[]>([]);
+
+  const runtime = useChatRuntime({
+    transport: new AssistantChatTransport({
+      api: "/api/chat",
+    }),
+  });
 
   useEffect(() => {
     // Load quiz data from sessionStorage
-    const quizId = params.id as string;
     const storedQuiz = sessionStorage.getItem(`quiz-${quizId}`);
 
     if (storedQuiz) {
@@ -135,62 +158,133 @@ export default function QuizDetailPage() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const fetchQuizId = (selectedQuizId: string) => {
+    console.log("Redirecting to quiz:", selectedQuizId);
+    router.push(`/quiz/${selectedQuizId}`);
+  };
+
+  const switchToQuiz = (selectedQuizId: string) => {
+    console.log("Switching to quiz:", selectedQuizId);
+    fetchQuizId(selectedQuizId);
+  };
+
+  const createNewQuiz = () => {
+    const newThreadId = crypto.randomUUID();
+    const newThread: QuizThread = {
+      id: newThreadId,
+      title: "New Chat",
+      createdAt: new Date(),
+    };
+
+    setQuizzes((prev) => [newThread, ...prev]);
+    router.push(`/quiz/${newThreadId}`);
+  };
+
+  const getQuizHistories = async () => {
+    try {
+      setIsLoadingQuizzes(true);
+      const response = await fetch("/api/quiz");
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const text = await response.text();
+      if (!text) {
+        console.warn("Empty response from quiz API");
+        setQuizzes([]);
+        return;
+      }
+      
+      const quizzes = JSON.parse(text);
+      console.log("Fetched quizzes:", quizzes);
+      setQuizzes(Array.isArray(quizzes) ? quizzes : []);
+    } catch (error) {
+      console.error("Error fetching quiz histories:", error);
+      setQuizzes([]);
+    } finally {
+      setIsLoadingQuizzes(false);
+    }
+  };
+
+  useEffect(() => {
+    getQuizHistories();
+  }, []);
+
   if (isLoading) {
     return (
-      <SidebarProvider>
-        <div className="flex h-dvh w-full pr-0.5">
-          <ThreadListSidebar />
-          <SidebarInset>
-            <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-              <SidebarTrigger />
-              <Separator orientation="vertical" className="mr-2 h-4" />
-              <div className="text-sm">Loading...</div>
-            </header>
-            <div className="flex flex-1 items-center justify-center p-6">
-              <div className="text-center">
-                <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-primary"></div>
-                <p>Loading quiz...</p>
+      <AssistantRuntimeProvider runtime={runtime}>
+        <SidebarProvider>
+          <div className="flex h-dvh w-full pr-0.5">
+            <NavigationSidebar 
+              module="quiz" 
+              currentId={quizId}
+              onCreateNew={createNewQuiz}
+              onRefresh={getQuizHistories}
+              onSwitch={switchToQuiz}
+              data={quizzes}
+            />
+            <SidebarInset>
+              <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+                <SidebarTrigger />
+                <Separator orientation="vertical" className="mr-2 h-4" />
+                <div className="text-sm">Loading...</div>
+              </header>
+              <div className="flex flex-1 items-center justify-center p-6">
+                <div className="text-center">
+                  <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-primary"></div>
+                  <p>Loading quiz...</p>
+                </div>
               </div>
-            </div>
-          </SidebarInset>
-        </div>
-      </SidebarProvider>
+            </SidebarInset>
+          </div>
+        </SidebarProvider>
+      </AssistantRuntimeProvider>
     );
   }
 
   if (!quizData?.questions || quizData.questions.length === 0) {
     return (
-      <SidebarProvider>
-        <div className="flex h-dvh w-full pr-0.5">
-          <ThreadListSidebar />
-          <SidebarInset>
-            <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-              <SidebarTrigger />
-              <Separator orientation="vertical" className="mr-2 h-4" />
-              <Breadcrumb>
-                <BreadcrumbList>
-                  <BreadcrumbItem>
-                    <BreadcrumbLink href="/quiz">Quiz</BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>Error</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
-            </header>
-            <div className="flex flex-1 items-center justify-center p-6">
-              <div className="text-center">
-                <p className="mb-4 text-lg">No quiz questions found</p>
-                <Button onClick={() => router.push("/quiz")}>
-                  <ChevronLeft className="mr-2 h-4 w-4" />
-                  Back to Quiz Selection
-                </Button>
+      <AssistantRuntimeProvider runtime={runtime}>
+        <SidebarProvider>
+          <div className="flex h-dvh w-full pr-0.5">
+            <NavigationSidebar 
+              module="quiz" 
+              currentId={quizId}
+              onCreateNew={createNewQuiz}
+              onRefresh={getQuizHistories}
+              onSwitch={switchToQuiz}
+              data={quizzes}
+            />
+            <SidebarInset>
+              <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+                <SidebarTrigger />
+                <Separator orientation="vertical" className="mr-2 h-4" />
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    <BreadcrumbItem>
+                      <BreadcrumbLink href="/quiz">Quiz</BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <BreadcrumbPage>Error</BreadcrumbPage>
+                    </BreadcrumbItem>
+                  </BreadcrumbList>
+                </Breadcrumb>
+              </header>
+              <div className="flex flex-1 items-center justify-center p-6">
+                <div className="text-center">
+                  <p className="mb-4 text-lg">No quiz questions found</p>
+                  <Button onClick={() => router.push("/quiz")}>
+                    <ChevronLeft className="mr-2 h-4 w-4" />
+                    Back to Quiz Selection
+                  </Button>
+                </div>
               </div>
-            </div>
-          </SidebarInset>
-        </div>
-      </SidebarProvider>
+            </SidebarInset>
+          </div>
+        </SidebarProvider>
+      </AssistantRuntimeProvider>
     );
   }
 
@@ -203,25 +297,33 @@ export default function QuizDetailPage() {
     ).length;
 
     return (
-      <SidebarProvider>
-        <div className="flex h-dvh w-full pr-0.5">
-          <ThreadListSidebar />
-          <SidebarInset>
-            <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-              <SidebarTrigger />
-              <Separator orientation="vertical" className="mr-2 h-4" />
-              <Breadcrumb>
-                <BreadcrumbList>
-                  <BreadcrumbItem>
-                    <BreadcrumbLink href="/quiz">Quiz</BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>Results</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
-            </header>
+      <AssistantRuntimeProvider runtime={runtime}>
+        <SidebarProvider>
+          <div className="flex h-dvh w-full pr-0.5">
+            <NavigationSidebar 
+              module="quiz" 
+              currentId={quizId}
+              onCreateNew={createNewQuiz}
+              onRefresh={getQuizHistories}
+              onSwitch={switchToQuiz}
+              data={quizzes}
+            />
+            <SidebarInset>
+              <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+                <SidebarTrigger />
+                <Separator orientation="vertical" className="mr-2 h-4" />
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    <BreadcrumbItem>
+                      <BreadcrumbLink href="/quiz">Quiz</BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <BreadcrumbPage>Results</BreadcrumbPage>
+                    </BreadcrumbItem>
+                  </BreadcrumbList>
+                </Breadcrumb>
+              </header>
             <div className="flex-1 p-6">
               <Card className="mx-auto max-w-2xl">
                 <CardHeader className="text-center">
@@ -304,44 +406,53 @@ export default function QuizDetailPage() {
           </SidebarInset>
         </div>
       </SidebarProvider>
+      </AssistantRuntimeProvider>
     );
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex h-dvh w-full pr-0.5">
-        <ThreadListSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="/quiz">Quiz</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>
-                    Question {currentQuestion + 1} of{" "}
-                    {quizData.questions.length}
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-            <div className="ml-auto flex items-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Clock className="h-4 w-4" />
-                {formatTime(timeElapsed)}
-              </div>
-              {quizData.subject && (
+    <AssistantRuntimeProvider runtime={runtime}>
+      <SidebarProvider>
+        <div className="flex h-dvh w-full pr-0.5">
+          <NavigationSidebar 
+            module="quiz" 
+            currentId={quizId}
+            onCreateNew={createNewQuiz}
+            onRefresh={getQuizHistories}
+            onSwitch={switchToQuiz}
+            data={quizzes}
+          />
+          <SidebarInset>
+            <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+              <SidebarTrigger />
+              <Separator orientation="vertical" className="mr-2 h-4" />
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href="/quiz">Quiz</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>
+                      Question {currentQuestion + 1} of{" "}
+                      {quizData.questions.length}
+                    </BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+              <div className="ml-auto flex items-center gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1">
-                  <BookOpen className="h-4 w-4" />
-                  {quizData.subject}
+                  <Clock className="h-4 w-4" />
+                  {formatTime(timeElapsed)}
                 </div>
-              )}
-            </div>
-          </header>
+                {quizData.subject && (
+                  <div className="flex items-center gap-1">
+                    <BookOpen className="h-4 w-4" />
+                    {quizData.subject}
+                  </div>
+                )}
+              </div>
+            </header>
           <div className="flex-1 p-6">
             <Card className="mx-auto max-w-2xl">
               <CardHeader>
@@ -421,8 +532,9 @@ export default function QuizDetailPage() {
               </CardContent>
             </Card>
           </div>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+    </AssistantRuntimeProvider>
   );
 }

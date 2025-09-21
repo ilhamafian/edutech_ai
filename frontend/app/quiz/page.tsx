@@ -1,6 +1,6 @@
-"use client";
+  "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import {
@@ -12,7 +12,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
+import { NavigationSidebar } from "@/components/ui/navigation-sidebar";
 import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
@@ -32,17 +32,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 // Define subjects and their quiz options
 const subjects = {
-  "komputer-sains-spm": {
+  math: {
     name: "SPM Computer Science",
     icon: Code,
     color: "bg-blue-500",
     quizzes: [
-      "1-pengkomputeran",
-      "2-pangkalan-data-lanjutan",
-      "3-pengaturcaraan-berasaskan-web",
+      "Pengkomputeran",
+      "Pangkalan Data Lanjutan",
+      "Pengaturcaraan Berasaskan WebChapter 3",
     ],
   },
 };
@@ -52,21 +53,29 @@ type SubjectKey = keyof typeof subjects;
 interface QuizConfig {
   subject: string;
   quizName: string;
+  totalQuestions: number;
   difficulty: string;
+}
+
+interface QuizThread {
+  id: string;
+  title: string;
+  createdAt: Date | string;
 }
 
 export default function QuizPage() {
   const router = useRouter();
+  const [isLoadingQuizzes, setIsLoadingQuizzes] = useState(false);
+  const [quizzes, setQuizzes] = useState<QuizThread[]>([]);
   const [currentSubject, setCurrentSubject] = useState<SubjectKey | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [selectedQuiz, setSelectedQuiz] = useState<{
-    subject: string;
-    quiz: string;
-  } | null>(null);
+  const [selectedQuiz, setSelectedQuiz] = useState<{subject: string, quiz: string} | null>(null);
+  const [currentQuizId, setCurrentQuizId] = useState<string | null>(null);
   const [quizConfig, setQuizConfig] = useState<QuizConfig>({
     subject: "",
     quizName: "",
+    totalQuestions: 10,
     difficulty: "medium",
   });
 
@@ -89,10 +98,64 @@ export default function QuizPage() {
     setQuizConfig({
       subject: subjectKey,
       quizName: quizName,
+      totalQuestions: 10,
       difficulty: "medium",
     });
     setIsModalOpen(true);
   };
+
+  const fetchQuizId = (quizId: string) => {
+    console.log("Redirecting to quiz:", quizId);
+    router.push(`/quiz/${quizId}`);
+  };
+
+  const switchToQuiz = (quizId: string) => {
+    console.log("Switching to quiz:", quizId);
+    fetchQuizId(quizId);
+  };
+
+  const createNewQuiz = () => {
+    const newThreadId = crypto.randomUUID();
+    const newThread: QuizThread = {
+      id: newThreadId,
+      title: "New Chat",
+      createdAt: new Date(),
+    };
+
+    setQuizzes((prev) => [newThread, ...prev]);
+    setCurrentQuizId(newThreadId);
+  };
+
+  const getQuizHistories = async () => {
+    try {
+      setIsLoadingQuizzes(true);
+      const response = await fetch("/api/quiz");
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const text = await response.text();
+      if (!text) {
+        console.warn("Empty response from quiz API");
+        setQuizzes([]);
+        return;
+      }
+      
+      const quizzes = JSON.parse(text);
+      console.log("Fetched quizzes:", quizzes);
+      setQuizzes(Array.isArray(quizzes) ? quizzes : []);
+    } catch (error) {
+      console.error("Error fetching quiz histories:", error);
+      setQuizzes([]);
+    } finally {
+      setIsLoadingQuizzes(false);
+    }
+  };
+
+  useEffect(() => {
+    getQuizHistories();
+  }, []);
 
   const handleStartQuiz = async () => {
     setIsGenerating(true);
@@ -262,7 +325,14 @@ export default function QuizPage() {
     <AssistantRuntimeProvider runtime={runtime}>
       <SidebarProvider>
         <div className="flex h-dvh w-full pr-0.5">
-          <ThreadListSidebar />
+          <NavigationSidebar 
+            module="quiz" 
+            currentId={currentQuizId}
+            onCreateNew={createNewQuiz}
+            onRefresh={getQuizHistories}
+            onSwitch={switchToQuiz}
+            data={quizzes}
+          />
           <SidebarInset>
             <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
               <SidebarTrigger />
@@ -285,6 +355,28 @@ export default function QuizPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label
+                  htmlFor="total-questions"
+                  className="text-right text-sm font-medium"
+                >
+                  Total Questions
+                </label>
+                <Input
+                  id="total-questions"
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={quizConfig.totalQuestions}
+                  onChange={(e) =>
+                    setQuizConfig({
+                      ...quizConfig,
+                      totalQuestions: parseInt(e.target.value) || 1,
+                    })
+                  }
+                  className="col-span-3"
+                />
+              </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label
                   htmlFor="difficulty"
@@ -310,11 +402,7 @@ export default function QuizPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={handleModalClose}
-                disabled={isGenerating}
-              >
+              <Button variant="outline" onClick={handleModalClose} disabled={isGenerating}>
                 Cancel
               </Button>
               <Button onClick={handleStartQuiz} disabled={isGenerating}>

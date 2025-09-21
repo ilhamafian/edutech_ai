@@ -101,14 +101,14 @@ async function getMessagesForSession(session_id: string) {
   try {
     // Call your Lambda function to get the specific chat with messages
     const lambdaUrl =
-      "https://ywcdy4t13i.execute-api.us-east-1.amazonaws.com/dev/qna";
+      "https://ywcdy4t13i.execute-api.us-east-1.amazonaws.com/dev/qna/get";
 
     console.log(
       `Calling Lambda for session messages: ${lambdaUrl}?user_id=1&session_id=${session_id}`,
     );
 
     const response = await fetch(
-      `${lambdaUrl}?user_id=1&session_id=${session_id}`,
+      `${lambdaUrl}?id=${session_id}`,
       {
         method: "GET",
         headers: {
