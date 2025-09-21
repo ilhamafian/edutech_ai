@@ -90,41 +90,8 @@ const subjects = {
     ],
     enabled: false,
   },
-  geography: {
-    name: "SPM Geography",
-    icon: Globe,
-    color: "bg-amber-500",
-    quizzes: [
-      "1-Physical Geography",
-      "2-Human Geography",
-      "3-Environmental Geography",
-    ],
-    enabled: false,
-  },
-  art: {
-    name: "SPM Art",
-    icon: Palette,
-    color: "bg-pink-500",
-    quizzes: [
-      "1-Art History",
-      "2-Art Techniques",
-      "3-Art Criticism",
-    ],
-    enabled: false,
-  },
-  literature: {
-    name: "SPM Literature",
-    icon: BookOpen,
-    color: "bg-indigo-500",
-    quizzes: [
-      "1-Malay Literature",
-      "2-English Literature",
-      "3-World Literature",
-    ],
-    enabled: false,
-  },
   electrical: {
-    name: "SPM Electrical Engineering",
+    name: "SPM Additional Mathematics",
     icon: Zap,
     color: "bg-yellow-500",
     quizzes: [
