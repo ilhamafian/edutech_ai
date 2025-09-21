@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
         console.log("Fetching quiz from Lambda:", quizId);
 
         // Call Lambda to get quiz data
-        const lambdaResponse = await fetch(`${lambdaUrl}?quiz_id=${quizId}`, {
+        const lambdaResponse = await fetch(`${lambdaUrl}?id=${quizId}`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",

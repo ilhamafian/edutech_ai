@@ -90,24 +90,23 @@ export default function QuizDetailPage() {
     }),
   });
 
-  // Function to fetch quiz data from API
+  // Function to fetch quiz data from GET lambda function
   const fetchQuizFromAPI = async (id: string): Promise<QuizData | null> => {
     try {
-      console.log("Fetching quiz data from API for ID:", id);
+      console.log("Fetching quiz data from GET lambda for ID:", id);
       const response = await fetch(`/api/quiz?quiz_id=${id}`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch quiz: ${response.status}`);
       }
 
-      const quizThread = await response.json();
-      console.log("Fetched quiz thread from API:", quizThread);
+      const quizData = await response.json();
+      console.log("Fetched quiz data from GET lambda:", quizData);
 
-      // For now, return null since we need the actual quiz questions
-      // This would need to be enhanced when you have a proper backend storage
-      return null;
+      // Return the quiz data from the new GET lambda function
+      return quizData;
     } catch (error) {
-      console.error("Error fetching quiz from API:", error);
+      console.error("Error fetching quiz from GET lambda:", error);
       return null;
     }
   };
@@ -129,6 +128,19 @@ export default function QuizDetailPage() {
           }
 
           console.log("Loaded quiz data from sessionStorage:", parsedQuiz);
+
+          // Debug the first question to understand data structure
+          if (parsedQuiz.questions && parsedQuiz.questions[0]) {
+            console.log("First question structure:", {
+              question:
+                parsedQuiz.questions[0].question?.substring(0, 50) + "...",
+              user_selected: parsedQuiz.questions[0].user_selected,
+              correct_answer: parsedQuiz.questions[0].correct_answer,
+              options: parsedQuiz.questions[0].options,
+              status: parsedQuiz.questions[0].status,
+            });
+          }
+
           setQuizData(parsedQuiz);
 
           // Check if quiz is completed (has status = "completed") and show results
@@ -138,9 +150,91 @@ export default function QuizDetailPage() {
             // Set selected answers from completed quiz data
             if (parsedQuiz.questions && Array.isArray(parsedQuiz.questions)) {
               const completedAnswers = parsedQuiz.questions.map(
-                (q: Question) => q.user_selected || "",
+                (q: Question, index: number) => {
+                  let userAnswer = q.user_selected || "";
+
+                  console.log(`Question ${index + 1} processing:`, {
+                    original_user_selected: q.user_selected,
+                    userAnswer_before: userAnswer,
+                    options: q.options,
+                    correct_answer: q.correct_answer,
+                  });
+
+                  // If user_selected is completely missing/undefined, we can't recover it
+                  if (
+                    q.user_selected === undefined ||
+                    q.user_selected === null
+                  ) {
+                    console.warn(
+                      `Question ${index + 1}: user_selected is undefined/null - completed quiz data may be incomplete`,
+                    );
+                  }
+
+                  // Handle different formats of user_selected
+                  if (userAnswer && q.options) {
+                    // Case 1: user_selected is already in full format (e.g., "A) Answer text")
+                    const directMatch = q.options.find(
+                      (option) => option === userAnswer,
+                    );
+                    if (directMatch) {
+                      console.log(`Question ${index + 1}: Direct match found`);
+                    }
+                    // Case 2: user_selected is just a key (e.g., "A")
+                    else if (!userAnswer.includes(")")) {
+                      const matchingOption = q.options.find((option) =>
+                        option.startsWith(userAnswer + ")"),
+                      );
+                      if (matchingOption) {
+                        console.log(
+                          `Question ${index + 1}: Converted "${userAnswer}" to "${matchingOption}"`,
+                        );
+                        userAnswer = matchingOption;
+                      } else {
+                        console.log(
+                          `Question ${index + 1}: No matching option found for key "${userAnswer}"`,
+                        );
+                        // Try case-insensitive search
+                        const caseInsensitiveMatch = q.options.find((option) =>
+                          option
+                            .toLowerCase()
+                            .startsWith(userAnswer.toLowerCase() + ")"),
+                        );
+                        if (caseInsensitiveMatch) {
+                          console.log(
+                            `Question ${index + 1}: Case-insensitive match found: "${caseInsensitiveMatch}"`,
+                          );
+                          userAnswer = caseInsensitiveMatch;
+                        }
+                      }
+                    }
+                    // Case 3: user_selected might be partial text - try to find best match
+                    else {
+                      const partialMatch = q.options.find(
+                        (option) =>
+                          option.includes(userAnswer) ||
+                          userAnswer.includes(option),
+                      );
+                      if (partialMatch) {
+                        console.log(
+                          `Question ${index + 1}: Partial match found: "${partialMatch}"`,
+                        );
+                        userAnswer = partialMatch;
+                      }
+                    }
+                  }
+
+                  console.log(
+                    `Question ${index + 1} final userAnswer:`,
+                    userAnswer,
+                  );
+                  return userAnswer;
+                },
               );
               setSelectedAnswers(completedAnswers);
+              console.log(
+                "Final selectedAnswers for completed quiz:",
+                completedAnswers,
+              );
             }
           } else {
             // Initialize selected answers array for new quiz
@@ -172,9 +266,90 @@ export default function QuizDetailPage() {
           // Set selected answers from completed quiz data
           if (Array.isArray(apiQuizData.questions)) {
             const completedAnswers = apiQuizData.questions.map(
-              (q: Question) => q.user_selected || "",
+              (q: Question, index: number) => {
+                let userAnswer = q.user_selected || "";
+
+                console.log(`API Question ${index + 1} processing:`, {
+                  original_user_selected: q.user_selected,
+                  userAnswer_before: userAnswer,
+                  options: q.options,
+                  correct_answer: q.correct_answer,
+                });
+
+                // If user_selected is completely missing/undefined, we can't recover it
+                if (q.user_selected === undefined || q.user_selected === null) {
+                  console.warn(
+                    `API Question ${index + 1}: user_selected is undefined/null - completed quiz data may be incomplete`,
+                  );
+                }
+
+                // Handle different formats of user_selected
+                if (userAnswer && q.options) {
+                  // Case 1: user_selected is already in full format (e.g., "A) Answer text")
+                  const directMatch = q.options.find(
+                    (option) => option === userAnswer,
+                  );
+                  if (directMatch) {
+                    console.log(
+                      `API Question ${index + 1}: Direct match found`,
+                    );
+                  }
+                  // Case 2: user_selected is just a key (e.g., "A")
+                  else if (!userAnswer.includes(")")) {
+                    const matchingOption = q.options.find((option) =>
+                      option.startsWith(userAnswer + ")"),
+                    );
+                    if (matchingOption) {
+                      console.log(
+                        `API Question ${index + 1}: Converted "${userAnswer}" to "${matchingOption}"`,
+                      );
+                      userAnswer = matchingOption;
+                    } else {
+                      console.log(
+                        `API Question ${index + 1}: No matching option found for key "${userAnswer}"`,
+                      );
+                      // Try case-insensitive search
+                      const caseInsensitiveMatch = q.options.find((option) =>
+                        option
+                          .toLowerCase()
+                          .startsWith(userAnswer.toLowerCase() + ")"),
+                      );
+                      if (caseInsensitiveMatch) {
+                        console.log(
+                          `API Question ${index + 1}: Case-insensitive match found: "${caseInsensitiveMatch}"`,
+                        );
+                        userAnswer = caseInsensitiveMatch;
+                      }
+                    }
+                  }
+                  // Case 3: user_selected might be partial text - try to find best match
+                  else {
+                    const partialMatch = q.options.find(
+                      (option) =>
+                        option.includes(userAnswer) ||
+                        userAnswer.includes(option),
+                    );
+                    if (partialMatch) {
+                      console.log(
+                        `API Question ${index + 1}: Partial match found: "${partialMatch}"`,
+                      );
+                      userAnswer = partialMatch;
+                    }
+                  }
+                }
+
+                console.log(
+                  `API Question ${index + 1} final userAnswer:`,
+                  userAnswer,
+                );
+                return userAnswer;
+              },
             );
             setSelectedAnswers(completedAnswers);
+            console.log(
+              "Final selectedAnswers for completed API quiz:",
+              completedAnswers,
+            );
           }
         } else {
           // Initialize selected answers array for new quiz
@@ -329,7 +504,34 @@ export default function QuizDetailPage() {
       }
 
       // Update quiz data with submission results
+      // Fix: Ensure user_selected field is populated from our local selectedAnswers
+      if (
+        submissionResult.questions &&
+        Array.isArray(submissionResult.questions)
+      ) {
+        submissionResult.questions.forEach(
+          (question: Question, index: number) => {
+            if (!question.user_selected && selectedAnswers[index]) {
+              question.user_selected = selectedAnswers[index];
+              console.log(
+                `Fixed missing user_selected for question ${index + 1}: "${selectedAnswers[index]}"`,
+              );
+            }
+          },
+        );
+      }
+
       setQuizData(submissionResult);
+
+      // Save the completed quiz with user_selected data to sessionStorage
+      sessionStorage.setItem(
+        `quiz-${quizId}`,
+        JSON.stringify(submissionResult),
+      );
+      console.log(
+        "Saved completed quiz to sessionStorage with user_selected data",
+      );
+
       setShowResults(true);
     } catch (error) {
       console.error("Error submitting quiz:", error);
@@ -533,6 +735,21 @@ export default function QuizDetailPage() {
   }
 
   const currentQ = quizData.questions[currentQuestion];
+
+  // Debug current state when rendering
+  if (showResults || isQuizCompleted) {
+    console.log("=== RENDERING QUIZ ===");
+    console.log("Current question index:", currentQuestion);
+    console.log(
+      "Current question:",
+      currentQ?.question?.substring(0, 50) + "...",
+    );
+    console.log("Current selectedAnswers:", selectedAnswers);
+    console.log("isQuizCompleted:", isQuizCompleted);
+    console.log("showResults:", showResults);
+    console.log("quiz status:", quizData.status);
+    console.log("===================");
+  }
 
   if (showResults) {
     console.log("Rendering results with quizData:", quizData);
@@ -920,45 +1137,69 @@ export default function QuizDetailPage() {
                       {currentQ.question}
                     </h2>
                     <div className="space-y-2">
-                      {currentQ.options.map((option, index) => (
-                        <button
-                          key={index}
-                          onClick={() => handleAnswerSelect(option)}
-                          disabled={showResults || isQuizCompleted}
-                          className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                            showResults || isQuizCompleted
-                              ? // For completed quizzes, show correct/incorrect styling
-                                currentQ.correct_answer === option
-                                ? "border-green-500 bg-green-50 text-green-900" // Correct answer
-                                : selectedAnswers[currentQuestion] === option
-                                  ? "border-red-500 bg-red-50 text-red-900" // User's wrong answer
-                                  : "cursor-not-allowed border-muted bg-muted/20 text-muted-foreground"
-                              : // For active quizzes
-                                selectedAnswers[currentQuestion] === option
-                                ? "border-primary bg-primary/5"
-                                : "border-border hover:border-primary/50 hover:bg-muted/50"
-                          }`}
-                        >
-                          <div className="flex w-full items-center justify-between">
-                            <div className="flex items-center">
-                              <span className="mr-2 font-medium">
-                                {String.fromCharCode(65 + index)}.
-                              </span>
-                              {option}
-                            </div>
-                            {(showResults || isQuizCompleted) && (
-                              <div className="ml-2 flex-shrink-0">
-                                {currentQ.correct_answer === option ? (
-                                  <Check className="h-4 w-4 text-green-600" />
-                                ) : selectedAnswers[currentQuestion] ===
-                                  option ? (
-                                  <X className="h-4 w-4 text-red-600" />
-                                ) : null}
+                      {currentQ.options.map((option, index) => {
+                        const isSelected =
+                          selectedAnswers[currentQuestion] === option;
+                        const isCorrect = currentQ.correct_answer === option;
+
+                        // Debug logging for completed quizzes
+                        if (showResults || isQuizCompleted) {
+                          console.log(
+                            `Question ${currentQuestion + 1}, Option "${option}":`,
+                            {
+                              isSelected,
+                              isCorrect,
+                              currentUserAnswer:
+                                selectedAnswers[currentQuestion],
+                              selectedAnswersArray: selectedAnswers,
+                              exactMatch:
+                                selectedAnswers[currentQuestion] === option,
+                              optionLength: option.length,
+                              userAnswerLength:
+                                selectedAnswers[currentQuestion]?.length || 0,
+                            },
+                          );
+                        }
+
+                        return (
+                          <button
+                            key={index}
+                            onClick={() => handleAnswerSelect(option)}
+                            disabled={showResults || isQuizCompleted}
+                            className={`w-full rounded-lg border p-4 text-left transition-colors ${
+                              showResults || isQuizCompleted
+                                ? // For completed quizzes, show correct/incorrect styling
+                                  isCorrect
+                                  ? "border-green-500 bg-green-50 text-green-900" // Correct answer
+                                  : isSelected
+                                    ? "border-red-500 bg-red-50 text-red-900" // User's wrong answer
+                                    : "cursor-not-allowed border-muted bg-muted/20 text-muted-foreground"
+                                : // For active quizzes
+                                  isSelected
+                                  ? "border-primary bg-primary/5"
+                                  : "border-border hover:border-primary/50 hover:bg-muted/50"
+                            }`}
+                          >
+                            <div className="flex w-full items-center justify-between">
+                              <div className="flex items-center">
+                                <span className="mr-2 font-medium">
+                                  {String.fromCharCode(65 + index)}.
+                                </span>
+                                {option}
                               </div>
-                            )}
-                          </div>
-                        </button>
-                      ))}
+                              {(showResults || isQuizCompleted) && (
+                                <div className="ml-2 flex-shrink-0">
+                                  {isCorrect ? (
+                                    <Check className="h-4 w-4 text-green-600" />
+                                  ) : isSelected ? (
+                                    <X className="h-4 w-4 text-red-600" />
+                                  ) : null}
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
