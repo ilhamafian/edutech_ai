@@ -40,9 +40,9 @@ const subjects = {
     icon: Code,
     color: "bg-blue-500",
     quizzes: [
-      "Pengkomputeran",
-      "Pangkalan Data Lanjutan",
-      "Pengaturcaraan Berasaskan WebChapter 3",
+      "1-Pengkomputeran",
+      "2-Pangkalan Data Lanjutan",
+      "3-Pengaturcaraan Berasaskan Web",
     ],
   },
 };
@@ -202,8 +202,17 @@ export default function QuizPage() {
         );
       }
 
+      // Ensure the quiz data has the quiz_id field set
+      const quizDataWithId = {
+        ...generatedQuiz,
+        quiz_id: quizId,
+        id: quizId, // Fallback compatibility
+      };
+
       // Store the quiz data in sessionStorage with the actual quiz ID
-      sessionStorage.setItem(`quiz-${quizId}`, JSON.stringify(generatedQuiz));
+      sessionStorage.setItem(`quiz-${quizId}`, JSON.stringify(quizDataWithId));
+
+      console.log("Stored quiz data with ID:", quizDataWithId);
 
       // Navigate to the quiz page using the actual quiz ID
       router.push(`/quiz/${quizId}`);

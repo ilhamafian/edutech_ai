@@ -3,7 +3,13 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { ChevronLeft, Clock, BookOpen } from "lucide-react";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import {
@@ -27,18 +33,28 @@ import {
 } from "@/components/ui/breadcrumb";
 
 interface Question {
+  number?: number;
   question: string;
   options: string[];
   correct_answer: string;
+  user_selected?: string;
+  status?: boolean;
   explanation?: string;
 }
 
 interface QuizData {
+  quiz_id?: string;
   questions?: Question[];
   title?: string;
   subject?: string;
   chapter?: string;
   difficulty?: string;
+  score?: number;
+  duration?: number;
+  feedback?: string;
+  status?: string;
+  created_at?: string;
+  completed_at?: string;
   // Handle case where the response might be a string
   [key: string]: unknown;
 }
@@ -58,12 +74,12 @@ export default function QuizDetailPage() {
   const [showResults, setShowResults] = useState(false);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Get quiz ID from params
   const quizId = params.id as string;
-  
+
   // State for sidebar functionality
-  const [isLoadingQuizzes, setIsLoadingQuizzes] = useState(false);
   const [quizzes, setQuizzes] = useState<QuizThread[]>([]);
 
   const runtime = useChatRuntime({
@@ -72,38 +88,79 @@ export default function QuizDetailPage() {
     }),
   });
 
-  useEffect(() => {
-    // Load quiz data from sessionStorage
-    const storedQuiz = sessionStorage.getItem(`quiz-${quizId}`);
+  // Function to fetch quiz data from API
+  const fetchQuizFromAPI = async (id: string): Promise<QuizData | null> => {
+    try {
+      console.log("Fetching quiz data from API for ID:", id);
+      const response = await fetch(`/api/quiz?quiz_id=${id}`);
 
-    if (storedQuiz) {
-      try {
-        let parsedQuiz = JSON.parse(storedQuiz);
-
-        // Handle case where the response might be a string that needs parsing
-        if (typeof parsedQuiz === "string") {
-          parsedQuiz = JSON.parse(parsedQuiz);
-        }
-
-        console.log("Loaded quiz data:", parsedQuiz);
-        setQuizData(parsedQuiz);
-
-        // Initialize selected answers array
-        if (parsedQuiz.questions) {
-          setSelectedAnswers(new Array(parsedQuiz.questions.length).fill(""));
-        }
-      } catch (error) {
-        console.error("Error parsing quiz data:", error);
-        alert("Error loading quiz data");
-        router.push("/quiz");
+      if (!response.ok) {
+        throw new Error(`Failed to fetch quiz: ${response.status}`);
       }
-    } else {
-      alert("Quiz not found");
-      router.push("/quiz");
-    }
 
-    setIsLoading(false);
-  }, [params.id, router]);
+      const quizThread = await response.json();
+      console.log("Fetched quiz thread from API:", quizThread);
+
+      // For now, return null since we need the actual quiz questions
+      // This would need to be enhanced when you have a proper backend storage
+      return null;
+    } catch (error) {
+      console.error("Error fetching quiz from API:", error);
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    const loadQuizData = async () => {
+      setIsLoading(true);
+
+      // First try to load from sessionStorage
+      const storedQuiz = sessionStorage.getItem(`quiz-${quizId}`);
+
+      if (storedQuiz) {
+        try {
+          let parsedQuiz = JSON.parse(storedQuiz);
+
+          // Handle case where the response might be a string that needs parsing
+          if (typeof parsedQuiz === "string") {
+            parsedQuiz = JSON.parse(parsedQuiz);
+          }
+
+          console.log("Loaded quiz data from sessionStorage:", parsedQuiz);
+          setQuizData(parsedQuiz);
+
+          // Initialize selected answers array
+          if (parsedQuiz.questions && Array.isArray(parsedQuiz.questions)) {
+            setSelectedAnswers(new Array(parsedQuiz.questions.length).fill(""));
+          }
+
+          setIsLoading(false);
+          return;
+        } catch (error) {
+          console.error("Error parsing quiz data from sessionStorage:", error);
+        }
+      }
+
+      // Fallback: try to fetch from API
+      console.log("Quiz not found in sessionStorage, attempting API fetch...");
+      const apiQuizData = await fetchQuizFromAPI(quizId);
+
+      if (apiQuizData && apiQuizData.questions) {
+        setQuizData(apiQuizData);
+        if (Array.isArray(apiQuizData.questions)) {
+          setSelectedAnswers(new Array(apiQuizData.questions.length).fill(""));
+        }
+      } else {
+        // Show user-friendly error message
+        console.error("Quiz not found in sessionStorage or API");
+        setQuizData(null);
+      }
+
+      setIsLoading(false);
+    };
+
+    loadQuizData();
+  }, [quizId, router]);
 
   useEffect(() => {
     // Timer for elapsed time
@@ -135,11 +192,122 @@ export default function QuizDetailPage() {
     }
   };
 
-  const handleSubmit = () => {
-    setShowResults(true);
+  const handleSubmit = async () => {
+    console.log("handleSubmit called");
+    console.log("Current quizData:", quizData);
+    console.log("Quiz ID from params:", quizId);
+    console.log("sessionStorage key:", `quiz-${quizId}`);
+    console.log(
+      "sessionStorage value:",
+      sessionStorage.getItem(`quiz-${quizId}`),
+    );
+
+    if (!quizData?.questions || !quizData.quiz_id) {
+      console.log("Missing quiz data or quiz_id:", {
+        hasQuestions: !!quizData?.questions,
+        hasQuizId: !!quizData?.quiz_id,
+        quizId: quizData?.quiz_id,
+        questionsLength: quizData?.questions?.length,
+      });
+      alert("Quiz data is not available for submission.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      console.log("Selected answers before transformation:", selectedAnswers);
+
+      // Transform selected answers to the format expected by Lambda
+      const userAnswers = selectedAnswers.map((answer, index) => {
+        // Extract just the key (A, B, C, D) from the selected answer "A) text"
+        const selectedKey = answer ? answer.split(")")[0] : "";
+        console.log(
+          `Question ${index + 1}: "${answer}" -> key: "${selectedKey}"`,
+        );
+        return {
+          question_number: index + 1,
+          selected_answer: selectedKey,
+        };
+      });
+
+      console.log("Transformed user answers:", userAnswers);
+      console.log("Submitting quiz:", {
+        quiz_id: quizData.quiz_id,
+        user_answers: userAnswers,
+        total_duration: timeElapsed,
+      });
+
+      // Call the submission API
+      const response = await fetch("/api/quiz", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          quiz_id: quizData.quiz_id,
+          user_answers: userAnswers,
+          total_duration: timeElapsed,
+        }),
+      });
+
+      console.log("Response status:", response.status);
+      console.log(
+        "Response headers:",
+        Object.fromEntries(response.headers.entries()),
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response text:", errorText);
+
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+
+        console.error("Parsed error data:", errorData);
+        throw new Error(
+          errorData.error || `HTTP ${response.status}: ${errorText}`,
+        );
+      }
+
+      const submissionResult = await response.json();
+      console.log("Submission result:", submissionResult);
+      console.log("Submission result questions:", submissionResult.questions);
+
+      // Debug the questions data structure
+      if (submissionResult.questions) {
+        submissionResult.questions.forEach((q: Question, i: number) => {
+          console.log(`Question ${i + 1}:`, {
+            question: q.question,
+            user_selected: q.user_selected,
+            correct_answer: q.correct_answer,
+            status: q.status,
+          });
+        });
+      }
+
+      // Update quiz data with submission results
+      setQuizData(submissionResult);
+      setShowResults(true);
+    } catch (error) {
+      console.error("Error submitting quiz:", error);
+      alert("Failed to submit quiz. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const calculateScore = () => {
+    // If we have a score from the submission, use that
+    if (quizData?.score !== undefined) {
+      return quizData.score;
+    }
+
+    // Otherwise calculate locally
     if (!quizData?.questions) return 0;
 
     let correct = 0;
@@ -182,28 +350,25 @@ export default function QuizDetailPage() {
 
   const getQuizHistories = async () => {
     try {
-      setIsLoadingQuizzes(true);
       const response = await fetch("/api/quiz");
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const text = await response.text();
       if (!text) {
         console.warn("Empty response from quiz API");
         setQuizzes([]);
         return;
       }
-      
+
       const quizzes = JSON.parse(text);
       console.log("Fetched quizzes:", quizzes);
       setQuizzes(Array.isArray(quizzes) ? quizzes : []);
     } catch (error) {
       console.error("Error fetching quiz histories:", error);
       setQuizzes([]);
-    } finally {
-      setIsLoadingQuizzes(false);
     }
   };
 
@@ -216,8 +381,8 @@ export default function QuizDetailPage() {
       <AssistantRuntimeProvider runtime={runtime}>
         <SidebarProvider>
           <div className="flex h-dvh w-full pr-0.5">
-            <NavigationSidebar 
-              module="quiz" 
+            <NavigationSidebar
+              module="quiz"
               currentId={quizId}
               onCreateNew={createNewQuiz}
               onRefresh={getQuizHistories}
@@ -248,8 +413,8 @@ export default function QuizDetailPage() {
       <AssistantRuntimeProvider runtime={runtime}>
         <SidebarProvider>
           <div className="flex h-dvh w-full pr-0.5">
-            <NavigationSidebar 
-              module="quiz" 
+            <NavigationSidebar
+              module="quiz"
               currentId={quizId}
               onCreateNew={createNewQuiz}
               onRefresh={getQuizHistories}
@@ -267,19 +432,50 @@ export default function QuizDetailPage() {
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                      <BreadcrumbPage>Error</BreadcrumbPage>
+                      <BreadcrumbPage>Quiz Not Found</BreadcrumbPage>
                     </BreadcrumbItem>
                   </BreadcrumbList>
                 </Breadcrumb>
               </header>
               <div className="flex flex-1 items-center justify-center p-6">
-                <div className="text-center">
-                  <p className="mb-4 text-lg">No quiz questions found</p>
-                  <Button onClick={() => router.push("/quiz")}>
-                    <ChevronLeft className="mr-2 h-4 w-4" />
-                    Back to Quiz Selection
-                  </Button>
-                </div>
+                <Card className="mx-auto max-w-md">
+                  <CardHeader className="text-center">
+                    <CardTitle className="text-xl">
+                      Quiz Not Available
+                    </CardTitle>
+                    <CardDescription>
+                      {quizData === null
+                        ? "This quiz could not be found. It may have expired or the link is invalid."
+                        : "No quiz questions were found for this quiz."}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-center">
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        Quiz ID:{" "}
+                        <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                          {quizId}
+                        </code>
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          onClick={() => router.push("/quiz")}
+                          className="w-full"
+                        >
+                          <ChevronLeft className="mr-2 h-4 w-4" />
+                          Back to Quiz Selection
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => window.location.reload()}
+                          className="w-full"
+                        >
+                          Try Again
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </SidebarInset>
           </div>
@@ -291,17 +487,34 @@ export default function QuizDetailPage() {
   const currentQ = quizData.questions[currentQuestion];
 
   if (showResults) {
+    console.log("Rendering results with quizData:", quizData);
+    console.log("Questions for results:", quizData.questions);
+
     const score = calculateScore();
-    const correctAnswers = quizData.questions.filter(
-      (question, index) => selectedAnswers[index] === question.correct_answer,
-    ).length;
+
+    // Count correct answers - use status field from Lambda if available
+    const correctAnswers = quizData.questions
+      ? quizData.questions.filter((question: Question) => {
+          console.log(`Question status check:`, {
+            question: question.question?.substring(0, 50) + "...",
+            status: question.status,
+            user_selected: question.user_selected,
+            correct_answer: question.correct_answer,
+          });
+          return question.status === true;
+        }).length
+      : 0;
+
+    console.log("Score:", score);
+    console.log("Correct answers count:", correctAnswers);
+    console.log("Total questions:", quizData.questions?.length);
 
     return (
       <AssistantRuntimeProvider runtime={runtime}>
         <SidebarProvider>
           <div className="flex h-dvh w-full pr-0.5">
-            <NavigationSidebar 
-              module="quiz" 
+            <NavigationSidebar
+              module="quiz"
               currentId={quizId}
               onCreateNew={createNewQuiz}
               onRefresh={getQuizHistories}
@@ -324,88 +537,202 @@ export default function QuizDetailPage() {
                   </BreadcrumbList>
                 </Breadcrumb>
               </header>
-            <div className="flex-1 p-6">
-              <Card className="mx-auto max-w-2xl">
-                <CardHeader className="text-center">
-                  <CardTitle className="text-2xl">Quiz Results</CardTitle>
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    {quizData.subject && <p>Subject: {quizData.subject}</p>}
-                    {quizData.chapter && <p>Chapter: {quizData.chapter}</p>}
-                    {quizData.difficulty && (
-                      <p>Difficulty: {quizData.difficulty}</p>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="text-center">
-                    <div className="mb-2 text-4xl font-bold text-primary">
-                      {score.toFixed(1)}%
-                    </div>
-                    <p className="text-lg">
-                      {correctAnswers} out of {quizData.questions.length}{" "}
-                      correct
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Time taken: {formatTime(timeElapsed)}
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Question Review:</h3>
-                    {quizData.questions.map((question, index) => (
-                      <div key={index} className="rounded-lg border p-4">
-                        <p className="mb-2 font-medium">
-                          {index + 1}. {question.question}
+              <div className="flex-1 p-6">
+                <Card className="mx-auto max-w-2xl">
+                  <CardHeader className="text-center">
+                    <CardTitle className="text-2xl">Quiz Results</CardTitle>
+                    <div className="space-y-2 text-sm">
+                      {quizData.title && (
+                        <p className="font-medium text-foreground">
+                          {quizData.title}
                         </p>
-                        <div className="space-y-1 text-sm">
-                          <p>
-                            <span className="font-medium">Your answer:</span>{" "}
+                      )}
+                      <div className="flex flex-wrap justify-center gap-4 text-muted-foreground">
+                        {quizData.subject && (
+                          <span>
+                            Subject: <strong>{quizData.subject}</strong>
+                          </span>
+                        )}
+                        {quizData.chapter && (
+                          <span>
+                            Chapter: <strong>{quizData.chapter}</strong>
+                          </span>
+                        )}
+                        {quizData.difficulty && (
+                          <span>
+                            Difficulty:{" "}
                             <span
-                              className={
-                                selectedAnswers[index] ===
-                                question.correct_answer
+                              className={`font-medium ${
+                                quizData.difficulty === "easy"
                                   ? "text-green-600"
-                                  : "text-red-600"
-                              }
+                                  : quizData.difficulty === "medium"
+                                    ? "text-yellow-600"
+                                    : "text-red-600"
+                              }`}
                             >
-                              {selectedAnswers[index] || "Not answered"}
+                              {quizData.difficulty.toUpperCase()}
                             </span>
-                          </p>
-                          <p>
-                            <span className="font-medium">Correct answer:</span>{" "}
-                            <span className="text-green-600">
-                              {question.correct_answer}
-                            </span>
-                          </p>
-                          {question.explanation && (
-                            <p className="text-muted-foreground">
-                              <span className="font-medium">Explanation:</span>{" "}
-                              {question.explanation}
-                            </p>
-                          )}
-                        </div>
+                          </span>
+                        )}
                       </div>
-                    ))}
-                  </div>
+                      {Boolean(quizData.quiz_id) && (
+                        <p className="text-xs text-muted-foreground">
+                          Quiz ID:{" "}
+                          <code className="rounded bg-muted px-1 py-0.5">
+                            {String(quizData.score)}
+                          </code>
+                        </p>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="text-center">
+                      <div className="mb-2 text-4xl font-bold text-primary">
+                        {score.toFixed(1)}%
+                      </div>
+                      <p className="text-lg">
+                        {correctAnswers} out of {quizData.questions.length}{" "}
+                        correct
+                      </p>
+                      {quizData.feedback && (
+                        <p className="text-lg font-medium text-primary">
+                          {quizData.feedback}
+                        </p>
+                      )}
+                      <p className="text-sm text-muted-foreground">
+                        Time taken:{" "}
+                        {formatTime(quizData.duration || timeElapsed)}
+                      </p>
+                      {/* Debug info - remove this in production */}
+                      <div className="mt-2 border-t pt-2 text-xs text-gray-500">
+                        <p>
+                          Debug: Score from Lambda: {quizData.score},
+                          Calculated:{" "}
+                          {(
+                            (correctAnswers / quizData.questions.length) *
+                            100
+                          ).toFixed(1)}
+                          %
+                        </p>
+                        <p>
+                          Status field available:{" "}
+                          {quizData.questions.some(
+                            (q: Question) => q.status !== undefined,
+                          )
+                            ? "Yes"
+                            : "No"}
+                        </p>
+                      </div>
+                    </div>
 
-                  <div className="flex justify-center gap-4">
-                    <Button
-                      onClick={() => router.push("/quiz")}
-                      variant="outline"
-                    >
-                      <ChevronLeft className="mr-2 h-4 w-4" />
-                      Back to Quiz Selection
-                    </Button>
-                    <Button onClick={() => window.location.reload()}>
-                      Retake Quiz
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </SidebarInset>
-        </div>
-      </SidebarProvider>
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">
+                        Question Review:
+                      </h3>
+                      {quizData.questions.map((question, index) => {
+                        // Get user's answer - prefer the submitted user_selected from Lambda
+                        let userAnswer =
+                          question.user_selected || selectedAnswers[index];
+
+                        // If user_selected is just a key (like "A"), find the full option text
+                        if (
+                          userAnswer &&
+                          !userAnswer.includes(")") &&
+                          question.options
+                        ) {
+                          const matchingOption = question.options.find(
+                            (option) => option.startsWith(userAnswer + ")"),
+                          );
+                          if (matchingOption) {
+                            userAnswer = matchingOption;
+                          }
+                        }
+
+                        // Extract just the key from both answers for comparison (A, B, C, D)
+                        const userKey = userAnswer
+                          ? userAnswer.split(")")[0].trim()
+                          : "";
+                        const correctKey = question.correct_answer
+                          ? question.correct_answer.split(")")[0].trim()
+                          : "";
+
+                        // Use the status from Lambda if available, otherwise compare keys
+                        const isCorrect =
+                          question.status !== undefined
+                            ? question.status
+                            : userKey === correctKey;
+
+                        console.log(`Question ${index + 1} display:`, {
+                          originalUserSelected: question.user_selected,
+                          fallbackSelectedAnswer: selectedAnswers[index],
+                          finalUserAnswer: userAnswer,
+                          userKey,
+                          correctKey,
+                          isCorrect,
+                          status: question.status,
+                          options: question.options?.slice(0, 2), // Show first 2 options for context
+                        });
+
+                        return (
+                          <div key={index} className="rounded-lg border p-4">
+                            <p className="mb-2 font-medium">
+                              {index + 1}. {question.question}
+                            </p>
+                            <div className="space-y-1 text-sm">
+                              <p>
+                                <span className="font-medium">
+                                  Your answer:
+                                </span>{" "}
+                                <span
+                                  className={
+                                    isCorrect
+                                      ? "text-green-600"
+                                      : "text-red-600"
+                                  }
+                                >
+                                  {userAnswer || "Not answered"}
+                                </span>
+                              </p>
+                              <p>
+                                <span className="font-medium">
+                                  Correct answer:
+                                </span>{" "}
+                                <span className="text-green-600">
+                                  {question.correct_answer}
+                                </span>
+                              </p>
+                              {question.explanation && (
+                                <p className="text-muted-foreground">
+                                  <span className="font-medium">
+                                    Explanation:
+                                  </span>{" "}
+                                  {question.explanation}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex justify-center gap-4">
+                      <Button
+                        onClick={() => router.push("/quiz")}
+                        variant="outline"
+                      >
+                        <ChevronLeft className="mr-2 h-4 w-4" />
+                        Back to Quiz Selection
+                      </Button>
+                      <Button onClick={() => window.location.reload()}>
+                        Retake Quiz
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </SidebarInset>
+          </div>
+        </SidebarProvider>
       </AssistantRuntimeProvider>
     );
   }
@@ -414,8 +741,8 @@ export default function QuizDetailPage() {
     <AssistantRuntimeProvider runtime={runtime}>
       <SidebarProvider>
         <div className="flex h-dvh w-full pr-0.5">
-          <NavigationSidebar 
-            module="quiz" 
+          <NavigationSidebar
+            module="quiz"
             currentId={quizId}
             onCreateNew={createNewQuiz}
             onRefresh={getQuizHistories}
@@ -432,6 +759,16 @@ export default function QuizDetailPage() {
                     <BreadcrumbLink href="/quiz">Quiz</BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator />
+                  {quizData.chapter && (
+                    <>
+                      <BreadcrumbItem>
+                        <BreadcrumbPage className="max-w-[200px] truncate">
+                          {quizData.chapter}
+                        </BreadcrumbPage>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator />
+                    </>
+                  )}
                   <BreadcrumbItem>
                     <BreadcrumbPage>
                       Question {currentQuestion + 1} of{" "}
@@ -451,87 +788,131 @@ export default function QuizDetailPage() {
                     {quizData.subject}
                   </div>
                 )}
+                {quizData.difficulty && (
+                  <div className="flex items-center gap-1">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                        quizData.difficulty === "easy"
+                          ? "bg-green-100 text-green-800"
+                          : quizData.difficulty === "medium"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {quizData.difficulty.toUpperCase()}
+                    </span>
+                  </div>
+                )}
               </div>
             </header>
-          <div className="flex-1 p-6">
-            <Card className="mx-auto max-w-2xl">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-xl">
-                    Question {currentQuestion + 1} of{" "}
-                    {quizData.questions.length}
-                  </CardTitle>
-                  <div className="text-sm text-muted-foreground">
-                    {Math.round(
-                      ((currentQuestion + 1) / quizData.questions.length) * 100,
-                    )}
-                    % Complete
+            <div className="flex-1 p-6">
+              <Card className="mx-auto max-w-2xl">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl">
+                        Question {currentQuestion + 1} of{" "}
+                        {quizData.questions.length}
+                      </CardTitle>
+                      {(quizData.subject || quizData.chapter) && (
+                        <CardDescription className="mt-1">
+                          {quizData.subject && `${quizData.subject}`}
+                          {quizData.subject && quizData.chapter && " • "}
+                          {quizData.chapter && `${quizData.chapter}`}
+                        </CardDescription>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-muted-foreground">
+                        {Math.round(
+                          ((currentQuestion + 1) / quizData.questions.length) *
+                            100,
+                        )}
+                        % Complete
+                      </div>
+                      {quizData.difficulty && (
+                        <div className="mt-1">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                              quizData.difficulty === "easy"
+                                ? "bg-green-100 text-green-800"
+                                : quizData.difficulty === "medium"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {quizData.difficulty.toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="h-2 w-full rounded-full bg-secondary">
-                  <div
-                    className="h-2 rounded-full bg-primary transition-all duration-300"
-                    style={{
-                      width: `${((currentQuestion + 1) / quizData.questions.length) * 100}%`,
-                    }}
-                  />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <h2 className="mb-4 text-lg font-medium">
-                    {currentQ.question}
-                  </h2>
-                  <div className="space-y-2">
-                    {currentQ.options.map((option, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleAnswerSelect(option)}
-                        className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                          selectedAnswers[currentQuestion] === option
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-primary/50 hover:bg-muted/50"
-                        }`}
+                  <div className="h-2 w-full rounded-full bg-secondary">
+                    <div
+                      className="h-2 rounded-full bg-primary transition-all duration-300"
+                      style={{
+                        width: `${((currentQuestion + 1) / quizData.questions.length) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div>
+                    <h2 className="mb-4 text-lg font-medium">
+                      {currentQ.question}
+                    </h2>
+                    <div className="space-y-2">
+                      {currentQ.options.map((option, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleAnswerSelect(option)}
+                          className={`w-full rounded-lg border p-4 text-left transition-colors ${
+                            selectedAnswers[currentQuestion] === option
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/50 hover:bg-muted/50"
+                          }`}
+                        >
+                          <span className="mr-2 font-medium">
+                            {String.fromCharCode(65 + index)}.
+                          </span>
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <Button
+                      onClick={handlePrevious}
+                      variant="outline"
+                      disabled={currentQuestion === 0}
+                    >
+                      <ChevronLeft className="mr-2 h-4 w-4" />
+                      Previous
+                    </Button>
+
+                    {currentQuestion === quizData.questions.length - 1 ? (
+                      <Button
+                        onClick={handleSubmit}
+                        disabled={
+                          !selectedAnswers[currentQuestion] || isSubmitting
+                        }
                       >
-                        <span className="mr-2 font-medium">
-                          {String.fromCharCode(65 + index)}.
-                        </span>
-                        {option}
-                      </button>
-                    ))}
+                        {isSubmitting ? "Submitting..." : "Submit Quiz"}
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={handleNext}
+                        disabled={!selectedAnswers[currentQuestion]}
+                      >
+                        Next
+                        <ChevronLeft className="ml-2 h-4 w-4 rotate-180" />
+                      </Button>
+                    )}
                   </div>
-                </div>
-
-                <div className="flex justify-between">
-                  <Button
-                    onClick={handlePrevious}
-                    variant="outline"
-                    disabled={currentQuestion === 0}
-                  >
-                    <ChevronLeft className="mr-2 h-4 w-4" />
-                    Previous
-                  </Button>
-
-                  {currentQuestion === quizData.questions.length - 1 ? (
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={!selectedAnswers[currentQuestion]}
-                    >
-                      Submit Quiz
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={handleNext}
-                      disabled={!selectedAnswers[currentQuestion]}
-                    >
-                      Next
-                      <ChevronLeft className="ml-2 h-4 w-4 rotate-180" />
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                </CardContent>
+              </Card>
+            </div>
           </SidebarInset>
         </div>
       </SidebarProvider>
