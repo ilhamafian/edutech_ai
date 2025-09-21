@@ -29,16 +29,21 @@ import {
   Brain
 } from "lucide-react";
 
+interface QuizPerformance {
+  subject: string;
+  chapter: string;
+  score: number;
+  time_seconds: number;
+  level: string;
+  completed_at: string;
+}
+
 interface AnalyticsData {
   total_quizzes: number;
   average_score: number;
   total_time_seconds: number;
   improvement_vs_previous_quiz: number;
-  recent_quiz_performance: {
-    score: number;
-    time_seconds: number;
-    level: string;
-  };
+  recent_quiz_performance: QuizPerformance[];
   time_analysis: {
     average_time_per_quiz: number;
     fastest_completion_seconds: number;
@@ -78,6 +83,19 @@ export default function AnalyticsPage() {
         return "bg-red-500";
       default:
         return "bg-gray-500";
+    }
+  };
+
+  const getDifficultyTextColor = (difficulty: string) => {
+    switch (difficulty.toLowerCase()) {
+      case "easy":
+        return "text-green-600";
+      case "medium":
+        return "text-yellow-600";
+      case "hard":
+        return "text-red-600";
+      default:
+        return "text-gray-600";
     }
   };
 
@@ -180,29 +198,40 @@ export default function AnalyticsPage() {
                       Recent Quiz Performance
                     </h3>
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-3 h-3 rounded-full ${getDifficultyColor(analyticsData.recent_quiz_performance.level)}`}></div>
-                          <div>
-                            <p className="font-medium">Latest Quiz</p>
-                            <p className="text-sm text-muted-foreground">Most recent attempt</p>
+                      {analyticsData.recent_quiz_performance.length > 0 ? (
+                        analyticsData.recent_quiz_performance.map((quiz, index) => (
+                          <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                            <div className="flex items-center gap-4">
+                              <div className={`w-3 h-3 rounded-full ${getDifficultyColor(quiz.level)}`}></div>
+                              <div>
+                                <p className="font-medium">{quiz.subject}</p>
+                                <p className="text-sm text-muted-foreground">{quiz.chapter}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(quiz.completed_at).toLocaleDateString()} at {new Date(quiz.completed_at).toLocaleTimeString()}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-6">
+                              <div className="text-center w-16">
+                                <p className={`font-bold ${getScoreColor(quiz.score)}`}>{quiz.score}%</p>
+                                <p className="text-xs text-muted-foreground">Score</p>
+                              </div>
+                              <div className="text-center w-16">
+                                <p className="font-medium">{quiz.time_seconds}s</p>
+                                <p className="text-xs text-muted-foreground">Time</p>
+                              </div>
+                              <div className="text-center w-16">
+                                <p className={`font-medium capitalize ${getDifficultyTextColor(quiz.level)}`}>{quiz.level}</p>
+                                <p className="text-xs text-muted-foreground">Level</p>
+                              </div>
+                            </div>
                           </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-4 text-muted-foreground">
+                          No recent quiz performance data available
                         </div>
-                        <div className="flex items-center gap-6">
-                          <div className="text-center">
-                            <p className={`font-bold ${getScoreColor(analyticsData.recent_quiz_performance.score)}`}>{analyticsData.recent_quiz_performance.score}%</p>
-                            <p className="text-xs text-muted-foreground">Score</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="font-medium">{analyticsData.recent_quiz_performance.time_seconds}s</p>
-                            <p className="text-xs text-muted-foreground">Time</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="font-medium text-sm capitalize">{analyticsData.recent_quiz_performance.level}</p>
-                            <p className="text-xs text-muted-foreground">Level</p>
-                          </div>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </Card>
 
@@ -233,7 +262,7 @@ export default function AnalyticsPage() {
                             {Object.entries(analyticsData.time_analysis.time_by_difficulty).map(([level, data]) => (
                               <div key={level} className="flex items-center gap-3">
                                 <div className={`w-3 h-3 rounded-full ${getDifficultyColor(level)}`}></div>
-                                <span className="text-sm capitalize flex-1">{level}</span>
+                                <span className={`text-sm capitalize flex-1 ${getDifficultyTextColor(level)}`}>{level}</span>
                                 <span className="font-medium">{data.average_time_seconds}s</span>
                               </div>
                             ))}
@@ -254,7 +283,7 @@ export default function AnalyticsPage() {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <div className={`w-3 h-3 rounded-full ${getDifficultyColor(level)}`}></div>
-                                <span className="font-medium capitalize">{level}</span>
+                                <span className={`font-medium capitalize ${getDifficultyTextColor(level)}`}>{level}</span>
                               </div>
                               <span className={`font-bold ${getScoreColor(stats.accuracy_percentage)}`}>
                                 {stats.accuracy_percentage}%
