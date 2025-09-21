@@ -70,7 +70,7 @@ TemanTutor is uniquely positioned in the market as a **High Quality, Low Price**
 
 **Team Cincai Only**
 
-* **[Ilham]** - Full Stack Developer - [GitHub/LinkedIn Profile Link]
-* **[Meor]**  -  Full Stack Developer - [GitHub/LinkedIn Profile Link]
-* **[Faiz]**  -  Full Stack Developer & AI Developer - [GitHub/LinkedIn Profile Link]
-* **[Arif]**  -  AI Developer - [GitHub/LinkedIn Profile Link]
+* **Ilham** - Software Developer - https://www.linkedin.com/in/ghazi-iskandar/
+* **Meor**  -  Software Developer - [GitHub/LinkedIn Profile Link]
+* **Faiz**  -  Software Developer - https://www.linkedin.com/in/mohamadfaizaiman/
+* **Arif**  -  AI Developer - https://www.linkedin.com/in/muhdarifikmal/
