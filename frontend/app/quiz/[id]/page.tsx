@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ChevronLeft, Clock, BookOpen } from "lucide-react";
+import { ChevronLeft, Clock, BookOpen, Check, X } from "lucide-react";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import {
   useChatRuntime,
@@ -131,8 +131,8 @@ export default function QuizDetailPage() {
           console.log("Loaded quiz data from sessionStorage:", parsedQuiz);
           setQuizData(parsedQuiz);
 
-          // Check if quiz is completed (has score) and show results
-          if (parsedQuiz.score !== undefined && parsedQuiz.score !== null) {
+          // Check if quiz is completed (has status = "completed") and show results
+          if (parsedQuiz.status === "completed") {
             console.log("Quiz is completed, showing results");
             setShowResults(true);
             // Set selected answers from completed quiz data
@@ -165,8 +165,8 @@ export default function QuizDetailPage() {
       if (apiQuizData && apiQuizData.questions) {
         setQuizData(apiQuizData);
 
-        // Check if quiz is completed (has score) and show results
-        if (apiQuizData.score !== undefined && apiQuizData.score !== null) {
+        // Check if quiz is completed (has status = "completed") and show results
+        if (apiQuizData.status === "completed") {
           console.log("API Quiz is completed, showing results");
           setShowResults(true);
           // Set selected answers from completed quiz data
@@ -207,7 +207,7 @@ export default function QuizDetailPage() {
 
   const handleAnswerSelect = (answer: string) => {
     // Don't allow answer selection for completed quizzes
-    if (showResults) {
+    if (showResults || isQuizCompleted) {
       return;
     }
     const newAnswers = [...selectedAnswers];
@@ -357,6 +357,16 @@ export default function QuizDetailPage() {
 
     return (correct / quizData.questions.length) * 100;
   };
+
+  // Check if quiz is completed (has status = "completed")
+  const isQuizCompleted = quizData?.status === "completed";
+
+  // Force showResults to be true for completed quizzes
+  useEffect(() => {
+    if (isQuizCompleted && !showResults) {
+      setShowResults(true);
+    }
+  }, [isQuizCompleted, showResults]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -617,7 +627,7 @@ export default function QuizDetailPage() {
                         <p className="text-xs text-muted-foreground">
                           Quiz ID:{" "}
                           <code className="rounded bg-muted px-1 py-0.5">
-                            {String(quizData.score)}
+                            {quizData.quiz_id}
                           </code>
                         </p>
                       )}
@@ -644,8 +654,8 @@ export default function QuizDetailPage() {
                       {/* Debug info - remove this in production */}
                       <div className="mt-2 border-t pt-2 text-xs text-gray-500">
                         <p>
-                          Debug: Score from Lambda: {quizData.score},
-                          Calculated:{" "}
+                          Debug: Status: {quizData.status}, Score from Lambda:{" "}
+                          {quizData.score}, Calculated:{" "}
                           {(
                             (correctAnswers / quizData.questions.length) *
                             100
@@ -846,6 +856,16 @@ export default function QuizDetailPage() {
             <div className="flex-1 p-6">
               <Card className="mx-auto max-w-2xl">
                 <CardHeader>
+                  {(showResults || isQuizCompleted) && (
+                    <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-900">
+                          Preview Mode - This quiz has been completed
+                        </span>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="text-xl">
@@ -904,19 +924,39 @@ export default function QuizDetailPage() {
                         <button
                           key={index}
                           onClick={() => handleAnswerSelect(option)}
-                          disabled={showResults}
+                          disabled={showResults || isQuizCompleted}
                           className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                            selectedAnswers[currentQuestion] === option
-                              ? "border-primary bg-primary/5"
-                              : showResults
-                                ? "cursor-not-allowed border-muted bg-muted/20 opacity-60"
+                            showResults || isQuizCompleted
+                              ? // For completed quizzes, show correct/incorrect styling
+                                currentQ.correct_answer === option
+                                ? "border-green-500 bg-green-50 text-green-900" // Correct answer
+                                : selectedAnswers[currentQuestion] === option
+                                  ? "border-red-500 bg-red-50 text-red-900" // User's wrong answer
+                                  : "cursor-not-allowed border-muted bg-muted/20 text-muted-foreground"
+                              : // For active quizzes
+                                selectedAnswers[currentQuestion] === option
+                                ? "border-primary bg-primary/5"
                                 : "border-border hover:border-primary/50 hover:bg-muted/50"
                           }`}
                         >
-                          <span className="mr-2 font-medium">
-                            {String.fromCharCode(65 + index)}.
-                          </span>
-                          {option}
+                          <div className="flex w-full items-center justify-between">
+                            <div className="flex items-center">
+                              <span className="mr-2 font-medium">
+                                {String.fromCharCode(65 + index)}.
+                              </span>
+                              {option}
+                            </div>
+                            {(showResults || isQuizCompleted) && (
+                              <div className="ml-2 flex-shrink-0">
+                                {currentQ.correct_answer === option ? (
+                                  <Check className="h-4 w-4 text-green-600" />
+                                ) : selectedAnswers[currentQuestion] ===
+                                  option ? (
+                                  <X className="h-4 w-4 text-red-600" />
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
                         </button>
                       ))}
                     </div>
@@ -926,31 +966,36 @@ export default function QuizDetailPage() {
                     <Button
                       onClick={handlePrevious}
                       variant="outline"
-                      disabled={currentQuestion === 0}
+                      disabled={currentQuestion === 0 || isQuizCompleted}
                     >
                       <ChevronLeft className="mr-2 h-4 w-4" />
                       Previous
                     </Button>
 
                     {currentQuestion === quizData.questions.length - 1 ? (
-                      <Button
-                        onClick={handleSubmit}
-                        disabled={
-                          !selectedAnswers[currentQuestion] ||
-                          isSubmitting ||
-                          showResults
-                        }
-                      >
-                        {showResults
-                          ? "Quiz Completed"
-                          : isSubmitting
-                            ? "Submitting..."
-                            : "Submit Quiz"}
-                      </Button>
+                      showResults || isQuizCompleted ? (
+                        <div className="text-sm font-medium text-muted-foreground">
+                          Preview Mode - Quiz Completed
+                        </div>
+                      ) : (
+                        <Button
+                          onClick={handleSubmit}
+                          disabled={
+                            !selectedAnswers[currentQuestion] ||
+                            isSubmitting ||
+                            isQuizCompleted
+                          }
+                        >
+                          {isSubmitting ? "Submitting..." : "Submit Quiz"}
+                        </Button>
+                      )
                     ) : (
                       <Button
                         onClick={handleNext}
-                        disabled={!selectedAnswers[currentQuestion]}
+                        disabled={
+                          (!showResults && !selectedAnswers[currentQuestion]) ||
+                          isQuizCompleted
+                        }
                       >
                         Next
                         <ChevronLeft className="ml-2 h-4 w-4 rotate-180" />

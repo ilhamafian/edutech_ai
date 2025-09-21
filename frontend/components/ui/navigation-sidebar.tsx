@@ -292,7 +292,7 @@ export function NavigationSidebar({
 
                   return (
                     <SidebarMenuItem key={thread.id}>
-                      <div className="group relative flex items-center">
+                      <div className="group relative flex items-center py-2">
                         <SidebarMenuButton
                           onClick={() => onSwitch?.(thread.id)}
                           className={`flex-1 justify-start gap-2 ${
