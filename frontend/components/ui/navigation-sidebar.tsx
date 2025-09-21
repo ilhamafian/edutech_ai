@@ -326,7 +326,7 @@ export function NavigationSidebar({
       </SidebarContent>
 
       <SidebarRail />
-      <SidebarFooter className="border-t">
+      {/* <SidebarFooter className="border-t">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
@@ -345,7 +345,7 @@ export function NavigationSidebar({
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-      </SidebarFooter>
+      </SidebarFooter> */}
     </Sidebar>
   );
 }

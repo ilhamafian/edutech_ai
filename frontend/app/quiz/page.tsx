@@ -22,7 +22,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { ChevronLeft, Code } from "lucide-react";
+import { ChevronLeft, Code, BookOpen, Calculator, Atom, Globe, Palette, Microscope, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -44,6 +44,95 @@ const subjects = {
       "2-Pangkalan Data Lanjutan",
       "3-Pengaturcaraan Berasaskan Web",
     ],
+    enabled: true,
+  },
+  mathematics: {
+    name: "SPM Mathematics",
+    icon: Calculator,
+    color: "bg-green-500",
+    quizzes: [
+      "1-Algebra",
+      "2-Geometry",
+      "3-Calculus",
+    ],
+    enabled: false,
+  },
+  physics: {
+    name: "SPM Physics",
+    icon: Atom,
+    color: "bg-purple-500",
+    quizzes: [
+      "1-Mechanics",
+      "2-Thermodynamics",
+      "3-Electricity",
+    ],
+    enabled: false,
+  },
+  chemistry: {
+    name: "SPM Chemistry",
+    icon: Microscope,
+    color: "bg-red-500",
+    quizzes: [
+      "1-Organic Chemistry",
+      "2-Inorganic Chemistry",
+      "3-Physical Chemistry",
+    ],
+    enabled: false,
+  },
+  biology: {
+    name: "SPM Biology",
+    icon: BookOpen,
+    color: "bg-emerald-500",
+    quizzes: [
+      "1-Cell Biology",
+      "2-Genetics",
+      "3-Ecology",
+    ],
+    enabled: false,
+  },
+  geography: {
+    name: "SPM Geography",
+    icon: Globe,
+    color: "bg-amber-500",
+    quizzes: [
+      "1-Physical Geography",
+      "2-Human Geography",
+      "3-Environmental Geography",
+    ],
+    enabled: false,
+  },
+  art: {
+    name: "SPM Art",
+    icon: Palette,
+    color: "bg-pink-500",
+    quizzes: [
+      "1-Art History",
+      "2-Art Techniques",
+      "3-Art Criticism",
+    ],
+    enabled: false,
+  },
+  literature: {
+    name: "SPM Literature",
+    icon: BookOpen,
+    color: "bg-indigo-500",
+    quizzes: [
+      "1-Malay Literature",
+      "2-English Literature",
+      "3-World Literature",
+    ],
+    enabled: false,
+  },
+  electrical: {
+    name: "SPM Electrical Engineering",
+    icon: Zap,
+    color: "bg-yellow-500",
+    quizzes: [
+      "1-Circuits",
+      "2-Electronics",
+      "3-Power Systems",
+    ],
+    enabled: false,
   },
 };
 
@@ -88,6 +177,10 @@ export default function QuizPage() {
   });
 
   const handleSubjectClick = (subjectKey: SubjectKey) => {
+    const subject = subjects[subjectKey];
+    if (!subject.enabled) {
+      return; // Don't navigate to disabled subjects
+    }
     setCurrentSubject(subjectKey);
   };
 
@@ -309,20 +402,25 @@ export default function QuizPage() {
       <div className="grid h-48 grid-cols-4 gap-4">
         {Object.entries(subjects).map(([key, subject]) => {
           const IconComponent = subject.icon;
+          const isDisabled = !subject.enabled;
           return (
             <div
               key={key}
-              className="flex cursor-pointer flex-col items-center justify-center gap-4 rounded-xl border bg-card p-6 font-medium text-muted-foreground shadow-sm transition-all duration-200 hover:scale-105 hover:shadow-md"
+              className={`flex flex-col items-center justify-center gap-4 rounded-xl border p-6 font-medium shadow-sm transition-all duration-200 ${
+                isDisabled
+                  ? "cursor-not-allowed bg-muted/50 opacity-60"
+                  : "cursor-pointer bg-card text-muted-foreground hover:scale-105 hover:shadow-md"
+              }`}
               onClick={() => handleSubjectClick(key as SubjectKey)}
             >
-              <div className={`rounded-lg p-4 ${subject.color} text-white`}>
+              <div className={`rounded-lg p-4 text-white ${subject.color} ${isDisabled ? "opacity-50" : ""}`}>
                 <IconComponent className="h-8 w-8" />
               </div>
-              <span className="text-center font-semibold text-foreground">
+              <span className={`text-center font-semibold ${isDisabled ? "text-muted-foreground" : "text-foreground"}`}>
                 {subject.name}
               </span>
               <span className="text-center text-xs text-muted-foreground">
-                {subject.quizzes.length} quizzes available
+                {isDisabled ? "Coming Soon" : `${subject.quizzes.length} quizzes available`}
               </span>
             </div>
           );
