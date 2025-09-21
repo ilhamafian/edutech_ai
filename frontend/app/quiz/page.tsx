@@ -58,6 +58,8 @@ interface QuizConfig {
 interface QuizThread {
   id: string;
   title: string;
+  chapter?: string;
+  score?: number;
   createdAt: Date | string;
 }
 
@@ -128,7 +130,7 @@ export default function QuizPage() {
   const getQuizHistories = async () => {
     try {
       setIsLoadingQuizzes(true);
-      const response = await fetch("/api/quiz");
+      const response = await fetch("/api/quiz?user_id=1");
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

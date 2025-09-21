@@ -37,6 +37,8 @@ interface Message {
 interface ChatThread {
   id: string;
   title: string;
+  chapter?: string;
+  score?: number;
   createdAt: Date | string;
 }
 
@@ -82,7 +84,6 @@ export function NavigationSidebar({
 }: NavigationSidebarProps & React.ComponentProps<typeof Sidebar>) {
   // Mock data for different modules
   const getMockData = (): ChatThread[] => {
-    
     switch (module) {
       case "chats":
         return [
@@ -93,7 +94,7 @@ export function NavigationSidebar({
           //   createdAt: new Date("2024-01-15T10:30:00")
           // },
           // {
-          //   id: "chat-2", 
+          //   id: "chat-2",
           //   title: "Python Data Structures Explained",
           //   messages: [],
           //   createdAt: new Date("2024-01-14T14:20:00")
@@ -111,31 +112,29 @@ export function NavigationSidebar({
           //   createdAt: new Date("2024-01-12T09:15:00")
           // }
         ];
-      
+
       case "quiz":
-        return [
-      
-        ];
-      
+        return [];
+
       case "analytics":
         return [
           {
             id: "analytics-1",
             title: "Weekly Performance Report",
-            createdAt: new Date("2024-01-15T09:00:00")
+            createdAt: new Date("2024-01-15T09:00:00"),
           },
           {
             id: "analytics-2",
             title: "Learning Progress - January",
-            createdAt: new Date("2024-01-08T12:00:00")
+            createdAt: new Date("2024-01-08T12:00:00"),
           },
           {
             id: "analytics-3",
             title: "Quiz Performance Analysis",
-            createdAt: new Date("2024-01-01T08:30:00")
-          }
+            createdAt: new Date("2024-01-01T08:30:00"),
+          },
         ];
-      
+
       default:
         return [];
     }
@@ -143,10 +142,11 @@ export function NavigationSidebar({
 
   // Use provided data if available, otherwise fall back to mock data
   const threads = data || getMockData();
-  
+
   // Determine which section to show chats based on module
-  const shouldShowChats = showChatSection || module === "chats" || threads.length > 0;
-  
+  const shouldShowChats =
+    showChatSection || module === "chats" || threads.length > 0;
+
   // Helper function to determine if a navigation item is active
   const isNavActive = (navModule: ModuleType) => {
     return module === navModule;
@@ -177,9 +177,13 @@ export function NavigationSidebar({
           <SidebarGroupLabel>Tools</SidebarGroupLabel>
           <SidebarMenu className="space-y-1">
             <SidebarMenuItem>
-              <SidebarMenuButton 
+              <SidebarMenuButton
                 asChild
-                className={isNavActive("chats") ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}
+                className={
+                  isNavActive("chats")
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : ""
+                }
               >
                 <Link href="/">
                   <BookOpen className="size-4" />
@@ -188,9 +192,13 @@ export function NavigationSidebar({
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton 
+              <SidebarMenuButton
                 asChild
-                className={isNavActive("quiz") ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}
+                className={
+                  isNavActive("quiz")
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : ""
+                }
               >
                 <Link href="/quiz">
                   <ListCheck className="size-4" />
@@ -199,9 +207,13 @@ export function NavigationSidebar({
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton 
+              <SidebarMenuButton
                 asChild
-                className={isNavActive("analytics") ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}
+                className={
+                  isNavActive("analytics")
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : ""
+                }
               >
                 <Link href="/analytics">
                   <ChartLine className="size-4" />
@@ -216,7 +228,11 @@ export function NavigationSidebar({
           <SidebarGroup className="group-data-[collapsible=icon]:hidden">
             <div className="flex items-center justify-between">
               <SidebarGroupLabel>
-                {module === "chats" ? "Chats" : module === "quiz" ? "Quiz History" : "Analytics"}
+                {module === "chats"
+                  ? "Chats"
+                  : module === "quiz"
+                    ? "Quiz History"
+                    : "Analytics"}
               </SidebarGroupLabel>
               <div className="flex gap-1">
                 {onCreateNew && (
@@ -225,7 +241,13 @@ export function NavigationSidebar({
                     size="sm"
                     variant="ghost"
                     className="h-6 w-6 p-0"
-                    title={module === "chats" ? "New Chat" : module === "quiz" ? "New Quiz" : "New Analysis"}
+                    title={
+                      module === "chats"
+                        ? "New Chat"
+                        : module === "quiz"
+                          ? "New Quiz"
+                          : "New Analysis"
+                    }
                   >
                     <PlusIcon className="h-4 w-4" />
                   </Button>
@@ -236,7 +258,13 @@ export function NavigationSidebar({
                     size="sm"
                     variant="ghost"
                     className="h-6 w-6 p-0"
-                    title={module === "chats" ? "Refresh Chats" : module === "quiz" ? "Refresh History" : "Refresh Analytics"}
+                    title={
+                      module === "chats"
+                        ? "Refresh Chats"
+                        : module === "quiz"
+                          ? "Refresh History"
+                          : "Refresh Analytics"
+                    }
                   >
                     <RefreshCwIcon className="h-4 w-4" />
                   </Button>
@@ -246,36 +274,44 @@ export function NavigationSidebar({
             <SidebarMenu className="space-y-1">
               {threads.length === 0 ? (
                 <div className="px-3 py-2 text-sm text-muted-foreground">
-                  {module === "chats" ? "No chat history yet" : 
-                   module === "quiz" ? "No quiz history yet" : 
-                   "No analytics data yet"}
+                  {module === "chats"
+                    ? "No chat history yet"
+                    : module === "quiz"
+                      ? "No quiz history yet"
+                      : "No analytics data yet"}
                 </div>
               ) : (
                 threads.map((thread) => {
                   // Choose icon based on module type
-                  const IconComponent = 
-                    module === "chats" ? MessageSquareIcon :
-                    module === "quiz" ? FileText :
-                    TrendingUp;
-                  
+                  const IconComponent =
+                    module === "chats"
+                      ? MessageSquareIcon
+                      : module === "quiz"
+                        ? FileText
+                        : TrendingUp;
+
                   return (
                     <SidebarMenuItem key={thread.id}>
                       <div className="group relative flex items-center">
                         <SidebarMenuButton
                           onClick={() => onSwitch?.(thread.id)}
                           className={`flex-1 justify-start gap-2 ${
-                            currentId === thread.id
-                              ? "bg-sidebar-accent"
-                              : ""
+                            currentId === thread.id ? "bg-sidebar-accent" : ""
                           }`}
                         >
                           <IconComponent className="size-4 flex-shrink-0" />
                           <div className="flex min-w-0 flex-1 flex-col items-start">
                             <span className="truncate text-sm font-medium">
-                              {thread.title}
+                              {module === "quiz" && thread.chapter
+                                ? thread.chapter
+                                : thread.title}
                             </span>
                             <span className="truncate text-xs text-muted-foreground">
-                              {new Date(thread.createdAt).toLocaleDateString()}
+                              {module === "quiz" && thread.score !== undefined
+                                ? `Score: ${thread.score}%`
+                                : new Date(
+                                    thread.createdAt,
+                                  ).toLocaleDateString()}
                             </span>
                           </div>
                         </SidebarMenuButton>

@@ -3,7 +3,15 @@ import { NextRequest, NextResponse } from "next/server";
 interface QuizThread {
   id: string;
   title: string;
+  chapter?: string;
+  score?: number;
   createdAt: string;
+}
+
+interface LambdaQuizHistory {
+  id: string;
+  chapter: string;
+  score: number;
 }
 
 interface LambdaQuestion {
@@ -13,29 +21,11 @@ interface LambdaQuestion {
   explanation?: string;
 }
 
-// Mock data for quiz histories - replace with actual database calls
-const mockQuizHistories: QuizThread[] = [
-  {
-    id: "437c8c58-a166-4d14-ad99-262db5c80971",
-    title: "SPM Computer Science - Pengkomputeran Quiz",
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // Yesterday
-  },
-  {
-    id: "537c8c58-a166-4d14-ad99-262db5c80971",
-    title: "SPM Computer Science - Pangkalan Data Quiz",
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-  },
-  {
-    id: "637c8c58-a166-4d14-ad99-262db5c80971",
-    title: "SPM Computer Science - WebChapter 3 Quiz",
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 1 week ago
-  },
-];
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const quizId = searchParams.get("quiz_id");
+    const userId = searchParams.get("user_id");
 
     // If quiz_id is provided, fetch specific quiz data from Lambda/DynamoDB
     if (quizId) {
@@ -56,16 +46,10 @@ export async function GET(request: NextRequest) {
 
         if (!lambdaResponse.ok) {
           console.error("Lambda GET error:", lambdaResponse.status);
-          // Fallback to mock data if Lambda fails
-          const quiz = mockQuizHistories.find((q) => q.id === quizId);
-          if (quiz) {
-            return NextResponse.json(quiz);
-          } else {
-            return NextResponse.json(
-              { error: "Quiz not found" },
-              { status: 404 },
-            );
-          }
+          return NextResponse.json(
+            { error: "Failed to fetch quiz from Lambda" },
+            { status: 500 },
+          );
         }
 
         const lambdaData = await lambdaResponse.json();
@@ -112,21 +96,62 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(transformedQuiz);
       } catch (error) {
         console.error("Error fetching quiz from Lambda:", error);
-        // Fallback to mock data
-        const quiz = mockQuizHistories.find((q) => q.id === quizId);
-        if (quiz) {
-          return NextResponse.json(quiz);
-        } else {
-          return NextResponse.json(
-            { error: "Quiz not found" },
-            { status: 404 },
-          );
-        }
+        return NextResponse.json(
+          { error: "Internal server error while fetching quiz" },
+          { status: 500 },
+        );
       }
     }
 
     // Return all quiz histories
-    return NextResponse.json(mockQuizHistories);
+    try {
+      if (!userId) {
+        return NextResponse.json(
+          { error: "user_id is required to fetch quiz histories" },
+          { status: 400 },
+        );
+      }
+
+      const lambdaUrl =
+        "https://ywcdy4t13i.execute-api.us-east-1.amazonaws.com/dev/exam/get";
+
+      console.log("Fetching quiz histories from Lambda for user:", userId);
+
+      const lambdaResponse = await fetch(`${lambdaUrl}?user_id=${userId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!lambdaResponse.ok) {
+        console.error("Lambda GET histories error:", lambdaResponse.status);
+        return NextResponse.json(
+          { error: "Failed to fetch quiz histories from Lambda" },
+          { status: 500 },
+        );
+      }
+
+      const lambdaData: LambdaQuizHistory[] = await lambdaResponse.json();
+      console.log("Retrieved quiz histories from Lambda:", lambdaData);
+
+      // Transform Lambda response to QuizThread format
+      const quizHistories: QuizThread[] = lambdaData.map((quiz) => ({
+        id: quiz.id,
+        title: `SPM Computer Science - ${quiz.chapter} Quiz`,
+        chapter: quiz.chapter,
+        score: quiz.score,
+        createdAt: new Date().toISOString(), // Since createdAt is not provided by API
+      }));
+
+      return NextResponse.json(quizHistories);
+    } catch (error) {
+      console.error("Error fetching quiz histories from Lambda:", error);
+      return NextResponse.json(
+        { error: "Internal server error while fetching quiz histories" },
+        { status: 500 },
+      );
+    }
   } catch (error) {
     console.error("Error in quiz API route:", error);
     return NextResponse.json(
@@ -272,15 +297,7 @@ async function handleQuizGeneration(body: {
       status: lambdaData.status || "completed",
     };
 
-    // Create quiz thread entry for history tracking
-    const newQuizThread: QuizThread = {
-      id: quizId,
-      title: quizResponse.title,
-      createdAt: new Date().toISOString(),
-    };
-
-    // Add to mock histories for now (replace with actual database storage)
-    mockQuizHistories.unshift(newQuizThread);
+    // Quiz thread will be tracked in the database via Lambda
 
     return NextResponse.json(quizResponse);
   } catch (error) {

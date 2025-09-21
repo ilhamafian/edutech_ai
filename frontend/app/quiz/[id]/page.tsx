@@ -62,6 +62,8 @@ interface QuizData {
 interface QuizThread {
   id: string;
   title: string;
+  chapter?: string;
+  score?: number;
   createdAt: Date | string;
 }
 
@@ -129,9 +131,24 @@ export default function QuizDetailPage() {
           console.log("Loaded quiz data from sessionStorage:", parsedQuiz);
           setQuizData(parsedQuiz);
 
-          // Initialize selected answers array
-          if (parsedQuiz.questions && Array.isArray(parsedQuiz.questions)) {
-            setSelectedAnswers(new Array(parsedQuiz.questions.length).fill(""));
+          // Check if quiz is completed (has score) and show results
+          if (parsedQuiz.score !== undefined && parsedQuiz.score !== null) {
+            console.log("Quiz is completed, showing results");
+            setShowResults(true);
+            // Set selected answers from completed quiz data
+            if (parsedQuiz.questions && Array.isArray(parsedQuiz.questions)) {
+              const completedAnswers = parsedQuiz.questions.map(
+                (q: Question) => q.user_selected || "",
+              );
+              setSelectedAnswers(completedAnswers);
+            }
+          } else {
+            // Initialize selected answers array for new quiz
+            if (parsedQuiz.questions && Array.isArray(parsedQuiz.questions)) {
+              setSelectedAnswers(
+                new Array(parsedQuiz.questions.length).fill(""),
+              );
+            }
           }
 
           setIsLoading(false);
@@ -147,8 +164,25 @@ export default function QuizDetailPage() {
 
       if (apiQuizData && apiQuizData.questions) {
         setQuizData(apiQuizData);
-        if (Array.isArray(apiQuizData.questions)) {
-          setSelectedAnswers(new Array(apiQuizData.questions.length).fill(""));
+
+        // Check if quiz is completed (has score) and show results
+        if (apiQuizData.score !== undefined && apiQuizData.score !== null) {
+          console.log("API Quiz is completed, showing results");
+          setShowResults(true);
+          // Set selected answers from completed quiz data
+          if (Array.isArray(apiQuizData.questions)) {
+            const completedAnswers = apiQuizData.questions.map(
+              (q: Question) => q.user_selected || "",
+            );
+            setSelectedAnswers(completedAnswers);
+          }
+        } else {
+          // Initialize selected answers array for new quiz
+          if (Array.isArray(apiQuizData.questions)) {
+            setSelectedAnswers(
+              new Array(apiQuizData.questions.length).fill(""),
+            );
+          }
         }
       } else {
         // Show user-friendly error message
@@ -172,6 +206,10 @@ export default function QuizDetailPage() {
   }, []);
 
   const handleAnswerSelect = (answer: string) => {
+    // Don't allow answer selection for completed quizzes
+    if (showResults) {
+      return;
+    }
     const newAnswers = [...selectedAnswers];
     newAnswers[currentQuestion] = answer;
     setSelectedAnswers(newAnswers);
@@ -350,7 +388,7 @@ export default function QuizDetailPage() {
 
   const getQuizHistories = async () => {
     try {
-      const response = await fetch("/api/quiz");
+      const response = await fetch("/api/quiz?user_id=1");
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -866,10 +904,13 @@ export default function QuizDetailPage() {
                         <button
                           key={index}
                           onClick={() => handleAnswerSelect(option)}
+                          disabled={showResults}
                           className={`w-full rounded-lg border p-4 text-left transition-colors ${
                             selectedAnswers[currentQuestion] === option
                               ? "border-primary bg-primary/5"
-                              : "border-border hover:border-primary/50 hover:bg-muted/50"
+                              : showResults
+                                ? "cursor-not-allowed border-muted bg-muted/20 opacity-60"
+                                : "border-border hover:border-primary/50 hover:bg-muted/50"
                           }`}
                         >
                           <span className="mr-2 font-medium">
@@ -895,10 +936,16 @@ export default function QuizDetailPage() {
                       <Button
                         onClick={handleSubmit}
                         disabled={
-                          !selectedAnswers[currentQuestion] || isSubmitting
+                          !selectedAnswers[currentQuestion] ||
+                          isSubmitting ||
+                          showResults
                         }
                       >
-                        {isSubmitting ? "Submitting..." : "Submit Quiz"}
+                        {showResults
+                          ? "Quiz Completed"
+                          : isSubmitting
+                            ? "Submitting..."
+                            : "Submit Quiz"}
                       </Button>
                     ) : (
                       <Button
