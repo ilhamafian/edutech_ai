@@ -597,15 +597,7 @@ export default function QuizDetailPage() {
   };
 
   const createNewQuiz = () => {
-    const newThreadId = crypto.randomUUID();
-    const newThread: QuizThread = {
-      id: newThreadId,
-      title: "New Chat",
-      createdAt: new Date(),
-    };
-
-    setQuizzes((prev) => [newThread, ...prev]);
-    router.push(`/quiz/${newThreadId}`);
+    router.push('/quiz');
   };
 
   const getQuizHistories = async () => {

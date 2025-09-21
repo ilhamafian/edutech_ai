@@ -403,7 +403,6 @@ export default function QuizPage() {
           <NavigationSidebar
             module="quiz"
             currentId={currentQuizId}
-            onCreateNew={createNewQuiz}
             onRefresh={getQuizHistories}
             onSwitch={switchToQuiz}
             data={quizzes}
