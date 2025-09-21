@@ -1,4 +1,4 @@
-  "use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -32,7 +32,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 
 // Define subjects and their quiz options
 const subjects = {
@@ -53,7 +52,6 @@ type SubjectKey = keyof typeof subjects;
 interface QuizConfig {
   subject: string;
   quizName: string;
-  totalQuestions: number;
   difficulty: string;
 }
 
@@ -70,12 +68,14 @@ export default function QuizPage() {
   const [currentSubject, setCurrentSubject] = useState<SubjectKey | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [selectedQuiz, setSelectedQuiz] = useState<{subject: string, quiz: string} | null>(null);
+  const [selectedQuiz, setSelectedQuiz] = useState<{
+    subject: string;
+    quiz: string;
+  } | null>(null);
   const [currentQuizId, setCurrentQuizId] = useState<string | null>(null);
   const [quizConfig, setQuizConfig] = useState<QuizConfig>({
     subject: "",
     quizName: "",
-    totalQuestions: 10,
     difficulty: "medium",
   });
 
@@ -98,7 +98,6 @@ export default function QuizPage() {
     setQuizConfig({
       subject: subjectKey,
       quizName: quizName,
-      totalQuestions: 10,
       difficulty: "medium",
     });
     setIsModalOpen(true);
@@ -130,18 +129,18 @@ export default function QuizPage() {
     try {
       setIsLoadingQuizzes(true);
       const response = await fetch("/api/quiz");
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const text = await response.text();
       if (!text) {
         console.warn("Empty response from quiz API");
         setQuizzes([]);
         return;
       }
-      
+
       const quizzes = JSON.parse(text);
       console.log("Fetched quizzes:", quizzes);
       setQuizzes(Array.isArray(quizzes) ? quizzes : []);
@@ -325,8 +324,8 @@ export default function QuizPage() {
     <AssistantRuntimeProvider runtime={runtime}>
       <SidebarProvider>
         <div className="flex h-dvh w-full pr-0.5">
-          <NavigationSidebar 
-            module="quiz" 
+          <NavigationSidebar
+            module="quiz"
             currentId={currentQuizId}
             onCreateNew={createNewQuiz}
             onRefresh={getQuizHistories}
@@ -357,28 +356,6 @@ export default function QuizPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <label
-                  htmlFor="total-questions"
-                  className="text-right text-sm font-medium"
-                >
-                  Total Questions
-                </label>
-                <Input
-                  id="total-questions"
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={quizConfig.totalQuestions}
-                  onChange={(e) =>
-                    setQuizConfig({
-                      ...quizConfig,
-                      totalQuestions: parseInt(e.target.value) || 1,
-                    })
-                  }
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <label
                   htmlFor="difficulty"
                   className="text-right text-sm font-medium"
                 >
@@ -402,7 +379,11 @@ export default function QuizPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={handleModalClose} disabled={isGenerating}>
+              <Button
+                variant="outline"
+                onClick={handleModalClose}
+                disabled={isGenerating}
+              >
                 Cancel
               </Button>
               <Button onClick={handleStartQuiz} disabled={isGenerating}>
